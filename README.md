@@ -1,45 +1,45 @@
-webaudio-mod-player
-===================
+# webaudio-mod-player
 
-This is a MOD/S3M/XM module player implemented in Javascript using the Web Audio API and runs fully within the browser. It
-has been tested and confirmed to work on Chrome 14+, Firefox 24+, Safari 6+ and Edge 20+. The Javascript performance of
-the browsers varies significantly, so some modules may stutter on one browser while the same module can play flawlessly
-on other ones. YMMV.
+This is a Protracker module player implemented in JavaScript using the Web Audio API. It supports standard 4-channel Amiga Protracker modules, as well as 6- and 8-channel PC FastTracker modules. Multichannel modules also work, although mod.dope ('28CH') has only been tested with.
 
-Although internally each file format is handled by a format specific player class, a front-end wrapper class is used to
-provide a common programming interface for the player.
+This app can be found live here: [http://webaudio-mod-player.mybluemix.net/](http://webaudio-mod-player.mybluemix.net/)
 
-All player classes use 32-bit floating point arithmetic in the channel mixing code, as well as a wide dynamic range. The
-output is scaled down to [-1, 1] domain using a "soft clipping" algorithm to roll off any audio peaks without harsh-sounding
-limiting. This should - in most cases - produce a reasonably constant audio volume for all modules.
-
-Additionally, S3M and XM player classes use linear sample interpolation and volume ramping to produce a smooth Gravis
-Ultrasound -like sound quality. The MOD player class attempts to sound more like an Amiga by allowing audio aliasing and
-applying a low pass filter.
-
-None of the player classes fully implement all the features and effects in each file format, but all the major ones should
-be implemented. In addition, there most certainly will be some playback bugs in each player class - let me know if you run
-into some bad ones. 
-
-You can test the player here:
-
-<a href="https://mod.haxor.fi/">https://mod.haxor.fi/</a>
-
-
-To install on your own server, clone the repo to the document root and edit+rename example.htaccess to match your domain.
-Then create a directory 'mods' alongside index.php and structure is like this (note that both PC-style and Amiga-style filenames
-are supported but extension must always be in lowercase):
-
-/mods<br/>
-/mods/Mantronix_and_Tip<br/>
-/mods/Mantronix_and_Tip/mod.overload<br/>
-/mods/Necros<br/>
-/mods/Necros/point.s3m<br/>
-/mods/mod.saf<br/>
-
+The player supports most Protracker effects, including the 'LED filter' command. Some effects still need work, though (try playing mod.black_queen by Dreamer - pattern loops fail spectacularly).
 
 Copyrights:
-- MOD/S3M/XM module player for Web Audio (c) 2012-2015 Jani Halme
+
+- Protracker module player for Web Audio (c) 2012-2014 Jani Halme
+  * modified by Chris Johnson (2015)
 - Topaz TTF font (c) 2009 dMG of Trueschool and Divine Stylers
-- "overload" (c) 1991 by Mantronix and Tip of Phenomena
-- "Point of Departure" (c) 1995 Necros / FM
+
+# Setup
+
+Note that this repo does not include any MOD files. You will need to find your own MOD files and add them to the `client-src/mods/` subdirectory. MOD files should be organized in folders by artist and named by song title. For example, a song titled "Overload" by "Mantronix and Tip" would be added to `client-src/mods/Mantronix_and_Tip/overload.mod`.
+
+## Local Build
+
+1. Clone [this webaudio-mod-player repo](https://github.com/jhnsnc/webaudio-mod-player)
+2. [Install NodeJS](https://nodejs.org/)
+3. Open a terminal and point it at the project directory
+4. Add MOD files to the `client-src/mods/` subdirectory
+5. Run `npm install`
+  * this will install node dependencies
+  * it should also run `gulp build` to create the `public/` directory
+6. Run `node bin/www` to launch the server, which you can then access at [http://localhost:6001](http://localhost:6001)
+
+## Develop
+
+* `gulp build-debug` will build the `public/` directory with uncompressed assets for easier development
+* `gulp watch` will look for changes in the `client-src/` directory and rebuild assets as needed
+* You may find it more convenient to use [nodemon](https://www.npmjs.com/package/nodemon) to launch the server while developing
+  1. Install nodemon by running `npm install -g nodemon`
+  2. Run the server with nodemon: `nodemon bin/www`
+  3. The server will now update whenever project files are modified (no need to restart the node server)
+* Once the server is running, access it at [http://localhost:6001](http://localhost:6001)
+  - As noted above, you will need to add your own MOD files to the `client-src/mods/` subdirectory
+
+## Deploy
+
+This project is currently set up to be easily deployed on [Bluemix](https://bluemix.net), though it could easily be modified to deploy elsewhere.
+
+The `.cfignore` and `manifest.yml` files deal with Bluemix deployment. To deploy on Bluemix, set up a new app through your dashboard, then modify the `manifest.yml` file appropriately, and use the [Cloud Foundry CLI to push the app live](https://www.ng.bluemix.net/docs/starters/upload_app.html) (`cf push`).
