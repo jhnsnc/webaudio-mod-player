@@ -1,0 +1,37 @@
+RewriteEngine on
+
+# DOCUMENT_ROOT = /home/vcap/app/htdocs/*
+RewriteCond %{HTTP_HOST} !^webaudio-mod-player.mybluemix.net$
+RewriteRule ^(.*)$ http://webaudio-mod-player.mybluemix.net/%{REQUEST_URI} [R,L]
+
+RewriteCond %{REQUEST_URI} ^/([a-zA-Z0-9_&-]+)$
+RewriteCond /app/htdocs/mods/%1 -d
+RewriteRule ^(.*)$ /?composer=%1 [L,QSA]
+
+RewriteCond %{REQUEST_URI} ^/([a-zA-Z0-9_&-]+)/$
+RewriteCond /app/htdocs/mods/%1 -d
+RewriteRule ^(.*)$ /?composer=%1 [L,QSA]
+
+RewriteCond %{REQUEST_URI} ^/([a-zA-Z0-9_&-]+)/mod.([a-zA-Z0-9_&-]+)$
+RewriteCond /app/htdocs/mods/%1/mod.%2 -f
+RewriteRule ^(.*)$ /?mod=%1/mod.%2 [L,QSA]
+
+RewriteCond %{REQUEST_URI} ^/mod.([a-zA-Z0-9_&-]+)$
+RewriteCond /app/htdocs/mods/mod.%1 -f
+RewriteRule ^(.*)$ /?mod=mod.%1 [L,QSA]
+
+RewriteCond %{REQUEST_URI} ^/([a-zA-Z0-9_&-/]+).mod$
+RewriteCond /app/htdocs/mods/%1.mod -f
+RewriteRule ^(.*)$ /?mod=%1.mod [L,QSA]
+
+RewriteCond %{REQUEST_URI} ^/([a-zA-Z0-9_&-/]+).s3m$
+RewriteCond /app/htdocs/mods/%1.s3m -f
+RewriteRule ^(.*)$ /?mod=%1.s3m [L,QSA]
+
+RewriteCond %{REQUEST_URI} ^/([a-zA-Z0-9_&-/]+).xm$
+RewriteCond /app/htdocs/mods/%1.xm -f
+RewriteRule ^(.*)$ /?mod=%1.xm [L,QSA]
+
+RewriteCond %{REQUEST_URI} ^/([a-zA-Z0-9_&-/]+).it$
+RewriteCond /app/htdocs/mods/%1.it -f
+RewriteRule ^(.*)$ /?mod=%1.it [L,QSA]
