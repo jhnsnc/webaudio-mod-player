@@ -1,68 +1,17 @@
 <!-- MOD/S3M/XM module player for Web Audio (c) 2012-2015 Firehawk/TDA (firehawk@haxor.fi) -->
-<?php
-  ///////////////////
-  // configuration
-  //
-
-  // when entering the website without a mod selected, the site will randomly pick one from
-  // the array below
-  $defmods=array(
-    "Necros/point_of_departure.s3m",
-    "Skaven/autonomous.s3m",
-    "Dune/x14.s3m",
-    "Purple_Motion/2nd_pm.s3m",
-    "Mantronix_and_Tip/mod.overload",
-    "Lizardking/mod.desert_dawn",
-    "Jester/mod.elysium",
-    "Uncle_Tom/mod.occ-san-geen",
-    "Captain/mod.beyond_music",
-    "Groo/mod.electrification"
-  );
-
-  // absolute URL path to where the modules are located - leading and trailing slashes are required!
-  $modulePath="/mods/";
-
-  //
-  //
-  ///////////////////
-?>
 <html>
   <head>
     <title>MOD/S3M/XM module player for Web Audio</title>
     <meta name="description" content="A MOD/S3M/XM module player in Javascript using the Web Audio API.">
-    <link rel="stylesheet" href="/style.css" type="text/css" media="screen" />
+    <link rel="stylesheet" href="/css/style.css" type="text/css" media="screen" />
     <script src="https://code.jquery.com/jquery-2.1.1.js"></script>
-<?php
-$browserAsString = $_SERVER['HTTP_USER_AGENT'];
-if (strstr($browserAsString, " AppleWebKit/") && strstr($browserAsString, " Mobile/"))
-{
-  echo "    <script type=\"text/javascript\">var mobileSafari=true;</script>";
-} else {
-  echo "    <script type=\"text/javascript\">var mobileSafari=false;</script>";
-}
-?>
     <script type="text/javascript" src="/js/utils.js"></script>
     <script type="text/javascript" src="/js/player.js"></script>
     <script type="text/javascript" src="/js/pt.js"></script>
     <script type="text/javascript" src="/js/st3.js"></script>
     <script type="text/javascript" src="/js/ft2.js"></script>
+    <script type="text/javascript" src="/js/render-utils.js"></script>
     <script type="text/javascript" src="/js/ui.js"></script>
-    <script type="text/javascript">
-      window.musicPath='<?php echo $modulePath; ?>';
-      window.musicLibrary=[];
-<?php
-  // randomize default song
-  $defmod=$defmods[rand(0, count($defmods)-1)];
-  if (array_key_exists('mod', $_REQUEST) && $_REQUEST['mod']!="") $defmod=$_REQUEST['mod'];
-  if (array_key_exists('composer', $_REQUEST) && $_REQUEST['composer']!="") {
-    echo "      window.currentModule='';\n";
-    echo "      window.defaultComposer='".$_REQUEST['composer']."';\n";
-  } else {
-    echo "      window.currentModule='".$defmod."';\n";
-    echo "      window.defaultComposer='';\n";
-  }
-?>
-    </script>
   </head>
   <body>
     <div id="outercontainer">
@@ -72,9 +21,9 @@ if (strstr($browserAsString, " AppleWebKit/") && strstr($browserAsString, " Mobi
         <div style="clear:both;"></div>
       </div>
       <div id="innercontainer">
-        <div id="modsamples"><?php for($i=0;$i<31;$i++) echo "\n"; ?></div>
+        <div id="modsamples"></div>
         <div style="position:relative;top:8px;margin-bottom:8px;">
-          <span id="modtitle"><?php for($i=0;$i<28;$i++) echo "&nbsp;"; ?></span>
+          <span id="modtitle">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
           <span id="modinfo">('&nbsp;&nbsp;&nbsp;&nbsp;')</span>
           <span id="modtimer"></span>
           <br/><br/>

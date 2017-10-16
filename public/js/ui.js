@@ -3,115 +3,62 @@
   (c) 2012-2015 firehawk/tda
 */
 
-var notelist=new Array("C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-");
+var musicPath = '/mods/';
+var musicLibrary = [];
 
-var ft2volcmds=new Array("m", "v", "^", "-", "+", "s", "~", "p", "&lt;", "&gt;"); // 0x5 .. 0xe
+var $patternVisualization;
+var $channelVisualization;
+var $samplesList;
 
-function notef(n,s,v,c,d,cc)
-{
-  function prn(n) { return (n==254)?"===":("<span class=\"note\">"+notelist[n&0x0f]+(n>>4)+"</span>"); }
-  function prv(v) { return (v<=0x40)?hb(v):(ft2volcmds[(v-0x50)>>4]+hn(v&0x0f)); }
+var $modTitle;
+var $modInfo;
+var $timingContainer;
 
-  // 14 chars per channel (max 112)
-  if (cc<=8) return ((n<255) ? (prn(n)+" ") : ("... "))+
-    (s ? ("<span class=\"sample\">"+hb(s)+"</span> ") : (".. "))+
-    ( (v!=255)?("<span class=\"volume\">"+prv(v)+"</span> "):(".. "))+
-    ((c!=0x2e) ? ("<span class=\"command\">"+String.fromCharCode(c)+hb(d)+"</span>") : "...")+
-    "|";
+var $btnPrevTrack;
+var $btnNextTrack;
+var $btnBack;
+var $btnForward;
+var $btnPlay;
+var $btnPause;
 
-  // 11 chars (max 110)
-  if (cc<=10) return ((n<255) ? prn(n) : ("..."))+
-    (s ? ("<span class=\"sample\">"+hb(s)+"</span>") : (".."))+
-    ( (v!=255)?("<span class=\"volume\">"+prv(v)+"</span>"):(".."))+
-    ((c!=0x2e) ? ("<span class=\"command\">"+String.fromCharCode(c)+hb(d)+"</span>") : "...")+
-    "|";
+var $btnRepeat;
+var $btnStereo;
+var $btnAmigaFilter;
+var $btnVisualizerMode;
+var $btnShowLoadDialog;
 
-  // 9 chars (max 108)
-  if (cc<=12) return ((n<255) ? prn(n) : ("..."))+
-    (s ? ("<span class=\"sample\">"+hb(s)+"</span>") :
-    ((v!=255)?("<span class=\"volume\">"+prv(v)+"</span>"):("..")))+
-    ((c!=0x2e) ? ("<span class=\"command\">"+String.fromCharCode(c)+hb(d)+"</span>") : "...")+
-    "|";
+var $btnLoadSelection;
 
-  // 7 chars (max 112)
-  if (cc<=16) return ((n<255) ? prn(n) : ("..."))+
-    ((c!=0x2e) ? ("<span class=\"command\">"+String.fromCharCode(c)+hb(d)+"</span>") :
-    ( s ? ("<span class=\"sample\">"+hb(s)+"</span>.") : ( (v!=255)?("<span class=\"volume\">"+prv(v)+"</span>."):("...")))
-    )+"|";
+function cacheUiElements() {
+  $patternVisualization = $('#modpattern');
+  $channelVisualization = $('#modchannels');
+  $samplesList = $('#modsamples');
 
-  // 3 chars (max 96)
-  return ((n<255) ? prn(n) :
-    (s ? (".<span class=\"sample\">"+hb(s)+"</span>") :
-    ((c!=0x2e) ? ("<span class=\"command\">"+String.fromCharCode(c)+hb(d)+"</span>") :
-    ((v!=255) ? (" <span class=\"volume\">"+prv(v)+"</span>"):("...")))));
-}
+  $modTitle = $('#modtitle');
+  $modInfo = $('#modinfo');
+  $timingContainer = $('#modtimer');
 
-function hn(n)
-{
-  if (typeof n == "undefined") return "0";
-  var s=(n&0x0f).toString(16);
-  return s.toUpperCase();
-}
+  $btnPrevTrack = $('#prev_track');
+  $btnNextTrack = $('#next_track');
+  $btnBack = $('#go_back');
+  $btnForward = $('#go_fwd');
+  $btnPlay = $('#play');
+  $btnPause = $('#pause');
 
-function hb(n)
-{
-  if (typeof n == "undefined") return "00";
-  var s=n.toString(16);
-  if (s.length==1) s='0'+s;
-  return s.toUpperCase();
-}
+  $btnRepeat = $('#modrepeat');
+  $btnStereo = $('#modpaula');
+  $btnVisualizerMode = $('#modvis');
+  $btnAmigaFilter = $('#modamiga');
+  $btnShowLoadDialog = $('#load_song');
 
-function hw(n)
-{
-  if (typeof n == "undefined") return "0000";
-  var s=n.toString(16);
-  if (s.length==3) s='0'+s;
-  else if (s.length==2) s='00'+s;
-  else if (s.length==1) s='000'+s;
-  return s.toUpperCase();
-}
-
-function pad(s,l)
-{
-  var ps=s;
-  if (ps.length > l) ps=ps.substring(0,l-1);
-  while (ps.length < l) ps+=" ";
-  return ps;
-}
-
-function rpe(s)
-{
-  var rs="";
-  for(var i=0;i<s.length;i++) {
-    if (s[i]=='>') rs+="&gt;"
-    else if (s[i]=='<') rs+='&lt';
-    else if (s[i]=='&') rs+='&amp;';
-    else rs+=s[i];
-  }
-  return rs;
-}
-
-function vu(l)
-{
-  var f=Math.round(l*20);
-  var b="";
-
-  b='<span style="color:#afa;">';
-  for(i=0;i<10;i++) b+=(i<f)?"&#x00BB;":"&nbsp;";
-  b+='</span><span style="color:#fea;">';
-  for(;i<16;i++) b+=(i<f)?"&#x00BB;":"&nbsp;";
-  b+='</span><span style="color:#faa;">';
-  for(;i<20;i++) b+=(i<f)?"&#x00BB;":"&nbsp;";
-  b+='</span>';
-
-  return b;
+  $btnLoadSelection = $('#load');
 }
 
 function showLoaderInfo(module)
 {
   window.loaderInterval=setInterval(function(){
     if (module.loading) {
-      $("#modtimer").html(module.state);
+      $timingContainer.html(module.state);
     } else {
       clearInterval(window.loaderInterval);
     }
@@ -194,33 +141,33 @@ function updateSelectBox(e)
   }
   $("#modfile").html(o);
   $("#modfile option").dblclick(function() {
-    $("#load").click();
+    $btnLoadSelection.click();
   });
 }
 
 function setVisualization(mod, v)
 {
-  var visNames=["[none]", "[trks]", "[chvu]"];
+  var visNames=['[none]', '[trks]', '[chvu]'];
   switch (v) {
-    case 0:
-      $("#modvis").removeClass("down");
+    case 0: // show none
+      $btnVisualizerMode.removeClass("down");
       $(".currentpattern").removeClass("currentpattern");
-      $("#modchannels").hide();
+      $channelVisualization.hide();
       break;
 
-    case 1:
-      $("#modvis").addClass("down");
-      if (mod && mod.playing) $("#pattern"+hb(mod.currentpattern())).addClass("currentpattern");
-      $("#modchannels").hide();
+    case 1: // show pattern data
+      $btnVisualizerMode.addClass("down");
+      if (mod && mod.playing) $("#pattern"+formatHex(mod.currentpattern(),2)).addClass("currentpattern");
+      $channelVisualization.hide();
       break;
 
-    case 2:
-      $("#modvis").addClass("down");
+    case 2: // show channel output
+      $btnVisualizerMode.addClass("down");
       $(".currentpattern").removeClass("currentpattern");
-      $("#modchannels").show();
+      $channelVisualization.show();
       break;
   }
-  $("#modvis").html(visNames[v]);
+  $btnVisualizerMode.html(visNames[v]);
   window.moduleVis=v;
 }
 
@@ -244,34 +191,34 @@ function updateUI(timestamp)
     if (window.moduleVis==2) {
       var txt, txt0="<br/>", txt1="<br/>";
       for(ch=0;ch<mod.channels;ch++) {
-        txt='<span class="channelnr">'+hb(ch)+'</span> ['+vu(mod.chvu[ch])+'] '+
-            '<span class="hl">'+hb(mod.currentsample(ch))+'</span>:<span class="channelsample">'+rpe(pad(mod.samplenames[mod.currentsample(ch)], 28))+"</span><br/>";
+        txt='<span class="channelnr">'+formatHex(ch,2)+'</span> ['+renderChannelLevel(mod.chvu[ch])+'] '+
+            '<span class="hl">'+formatHex(mod.currentsample(ch),2)+'</span>:<span class="channelsample">'+formatUiString(mod.samplenames[mod.currentsample(ch)], 28)+"</span><br/>";
         if (ch&1) txt0+=txt; else txt1+=txt;
       }
       $("#even-channels").html(txt0);
       $("#odd-channels").html(txt1);
     } else if (window.moduleVis==1) {
       if (oldpos>=0 && oldrow>=0) $(".currentrow").removeClass("currentrow");
-      $("#pattern"+hb(mod.currentpattern())+"_row"+hb(mod.row)).addClass("currentrow");
-      $("#pattern"+hb(mod.currentpattern())).scrollTop(mod.row*16);
+      $("#pattern"+formatHex(mod.currentpattern(),2)+"_row"+formatHex(mod.row,2)).addClass("currentrow");
+      $("#pattern"+formatHex(mod.currentpattern(),2)).scrollTop(mod.row*16);
       if (oldpos != mod.position) {
         if (oldpos>=0) $(".currentpattern").removeClass("currentpattern");
-        $("#pattern"+hb(mod.currentpattern())).addClass("currentpattern");
+        $("#pattern"+formatHex(mod.currentpattern(),2)).addClass("currentpattern");
       }
     }
 
     if (oldrow != mod.row || oldpos != mod.position) {
-      $("#modtimer").replaceWith("<span id=\"modtimer\">"+
-        "pos <span class=\"hl\">"+hb(mod.position)+"</span>/<span class=\"hl\">"+hb(mod.songlen)+"</span> "+
-        "row <span class=\"hl\">"+hb(mod.row)+"</span>/<span class=\"hl\">"+hb(mod.currentpattlen()-1)+"</span> "+
+      $timingContainer.replaceWith("<span id=\"modtimer\">"+
+        "pos <span class=\"hl\">"+formatHex(mod.position,2)+"</span>/<span class=\"hl\">"+formatHex(mod.songlen,2)+"</span> "+
+        "row <span class=\"hl\">"+formatHex(mod.row,2)+"</span>/<span class=\"hl\">"+formatHex(mod.currentpattlen()-1,2)+"</span> "+
         "speed <span class=\"hl\">"+mod.speed+"</span> "+
         "bpm <span class=\"hl\">"+mod.bpm+"</span> "+
         "filter <span class=\"hl\">"+(mod.filter ? "on" : "off")+"</span>"+
         "</span>");
 
-      $("#modsamples").children().removeClass("activesample");
+      $samplesList.children().removeClass("activesample");
       for(c=0;c<mod.channels;c++)
-        if (mod.noteon(c)) $("#sample"+hb(mod.currentsample(c)+1)).addClass("activesample");
+        if (mod.noteon(c)) $("#sample"+formatHex(mod.currentsample(c)+1,2)).addClass("activesample");
     }
     oldpos=mod.position;
     oldrow=mod.row;
@@ -281,56 +228,56 @@ function updateUI(timestamp)
 
 
 $(document).ready(function() {
+  // cache UI elements
+  cacheUiElements();
+
+  // set up module player
   window.module=new Modplayer();
   window.playlistPosition=0;
   window.playlistActive=false;
 
-  if (mobileSafari) {
-    setVisualization(null, 0);
-  } else {
-    setVisualization(null, 1);
-  }
+  setVisualization(null, 1);
 
   if(typeof(Storage) !== "undefined") {
     // read previous button states from localStorage
     if (localStorage["modrepeat"]) {
       if (localStorage["modrepeat"]=="true") {
-        $("#modrepeat").addClass("down");
+        $btnRepeat.addClass("down");
         module.setrepeat(true);
       } else {
-        $("#modrepeat").removeClass("down");
+        $btnRepeat.removeClass("down");
         module.setrepeat(false);
       }
     }
     if (localStorage["modamiga"]) {
       if (localStorage["modamiga"]=="500") {
-        $("#modamiga").addClass("down");
+        $btnAmigaFilter.addClass("down");
         module.setamigamodel("500");
       } else {
-        $("#modamiga").removeClass("down");
+        $btnAmigaFilter.removeClass("down");
         module.setamigamodel("1200");
       }
     }
     if (localStorage["modpaula"]) {
       switch (parseInt(localStorage["modpaula"])) {
         case 0:
-        $("#modpaula").addClass("stereo");
-        $("#modpaula").addClass("down");
-        $("#modpaula").html("[))((]");
+        $btnStereo.addClass("stereo");
+        $btnStereo.addClass("down");
+        $btnStereo.html("[))((]");
         module.setseparation(0);
         break;
 
         case 1:
-        $("#modpaula").removeClass("stereo");
-        $("#modpaula").addClass("down");
-        $("#modpaula").html("[)oo(]");
+        $btnStereo.removeClass("stereo");
+        $btnStereo.addClass("down");
+        $btnStereo.html("[)oo(]");
         module.setseparation(1);
         break;
 
         case 2:
-        $("#modpaula").removeClass("stereo");
-        $("#modpaula").removeClass("down");
-        $("#modpaula").html("[mono]");
+        $btnStereo.removeClass("stereo");
+        $btnStereo.removeClass("down");
+        $btnStereo.html("[mono]");
         module.setseparation(2);
         break;
       }
@@ -343,64 +290,50 @@ $(document).ready(function() {
       setVisualization(null, parseInt(localStorage["modvis"]));
   }
 
-  module.onReady=function() {
-    $("#modtitle").html(rpe(pad(this.title, 28)));
-    $("#modsamples").html("");
+  module.addEventListener('ready', function() {
+    $modTitle.html(formatUiString(module.title, 28));
+    $samplesList.html("");
     for(i=0;i<31;i++)
-      $("#modsamples").append("<span class=\"samplelist\" id=\"sample"+hb(i+1)+"\">"+hb(i+1)+" "+rpe(pad(this.samplenames[i], 28))+"</span>\n");
-    $("#modinfo").html("");
-    $("#modinfo").append("('"+this.signature+"')");
+      $samplesList.append("<span class=\"samplelist\" id=\"sample"+formatHex(i+1,2)+"\">"+formatHex(i+1,2)+" "+formatUiString(module.samplenames[i], 28)+"</span>\n");
+    $modInfo.html("");
+    $modInfo.append("('"+module.signature+"')");
     var s=window.currentModule.split("/");
+    var titleString;
     if (s.length > 1) {
-      $("title").html(s[1]+" - module player for Web Audio");
-      window.history.pushState("object of string", "Title", "/"+s[0]+"/"+s[1]);
+      titleString = s[1]+" - module player for Web Audio";
+      document.title = titleString;
+      window.history.pushState('', titleString, "/?composer="+s[0]+"&track="+s[1]);
     } else {
-      $("title").html(s[0]+" - module player for Web Audio");
-      window.history.pushState("object of string", "Title", "/"+s[0]);
+      titleString = s[0]+" - module player for Web Audio";
+      document.title = titleString;
+      window.history.pushState('', titleString, "/?track="+s[0]);
     }
 
     if (window.playlistActive) {
-      $("#prev_track").removeClass("inactive");
-      $("#next_track").removeClass("inactive");
+      $btnPrevTrack.removeClass("inactive");
+      $btnNextTrack.removeClass("inactive");
     } else {
-      $("#prev_track").addClass("inactive");
-      $("#next_track").addClass("inactive");
+      $btnPrevTrack.addClass("inactive");
+      $btnNextTrack.addClass("inactive");
     }
 
-    var pd="";
-    for(p=0;p<this.patterns;p++) {
-      var pp, pdata;
-      pd+="<div class=\"patterndata\" id=\"pattern"+hb(p)+"\">";
-      for(i=0; i<12; i++) pd+="\n";
-      pdata=this.patterndata(p);
-      for(i=0; i<(pdata.length/(5*this.channels)); i++) {
-        pp=i*5*this.channels;
-        pd+="<span class=\"patternrow\" id=\"pattern"+hb(p)+"_row"+hb(i)+"\">"+hb(i)+"|";
-        for(c=0;c<this.channels;c++) {
-          pd+=notef(pdata[pp+c*5+0], pdata[pp+c*5+1], pdata[pp+c*5+2], pdata[pp+c*5+3], pdata[pp+c*5+4], this.channels);
-        }
-        pd+="</span>\n";
-      }
-      for(i=0; i<24; i++) pd+="\n";
-      pd+="</div>";
-    }
-    $("#modpattern").html(pd);
-    $("#modtimer").html("ready.");
-  };
+    $patternVisualization.html(renderPatternData(module.patterns, module.channels, module.patterndata, module));
+    $timingContainer.html("ready.");
+  });
 
-  module.onPlay=function() {
-    $("#play").html("[stop]");
-    if (!this.paused) $("#pause").removeClass("down");
+  module.addEventListener('play', function() {
+    $btnPlay.html("[stop]");
+    if (!module.paused) $btnPause.removeClass("down");
     requestAnimationFrame(updateUI);
-  };
+  });
 
-  module.onStop=function() {
-    $("#modsamples").children().removeClass("activesample");
+  module.addEventListener('stop', function() {
+    $samplesList.children().removeClass("activesample");
     $("#even-channels").html("");
     $("#odd-channels").html("");
     $(".currentpattern").removeClass("currentpattern");
-    $("#modtimer").html("stopped");
-    $("#play").html("[play]");
+    $timingContainer.html("stopped");
+    $btnPlay.html("[play]");
 
     // if in playlist mode, load next song
     if (window.playlistActive && module.endofsong) {
@@ -417,77 +350,77 @@ $(document).ready(function() {
         playFromPlaylist(module, true);
       }
     }
-  };
+  });
 
-  $("#play").click(function(){
+  $btnPlay.click(function(){
     if (module.playing) {
       module.stop();
-      $("#pause").removeClass("down");
+      $btnPause.removeClass("down");
       return false;
     }
     module.play();
     return false;
   });
 
-  $("#pause").click(function(){
-      $("#pause").toggleClass("down");
+  $btnPause.click(function(){
+      $btnPause.toggleClass("down");
       module.pause();
       return false;
   });
 
-  $("#go_back").click(function(){
+  $btnBack.click(function(){
     module.jump(-1);
     return false;
   });
 
-  $("#go_fwd").click(function(){
+  $btnForward.click(function(){
     module.jump(1);
     return false;
   });
 
-  $("#modrepeat").click(function(){
-    $("#modrepeat").toggleClass("down");
-    module.setrepeat($("#modrepeat").hasClass("down"));
-    if(typeof(Storage) !== "undefined") localStorage.setItem("modrepeat", $("#modrepeat").hasClass("down"));
+  $btnRepeat.click(function(){
+    $btnRepeat.toggleClass("down");
+    module.setrepeat($btnRepeat.hasClass("down"));
+    if(typeof(Storage) !== "undefined") localStorage.setItem("modrepeat", $btnRepeat.hasClass("down"));
     return false;
   });
 
-  $("#modpaula").click(function() {
-    if ($("#modpaula").hasClass("down")) {
-      if ($("#modpaula").hasClass("stereo")) {
-        $("#modpaula").toggleClass("stereo");
-        $("#modpaula").toggleClass("down");
+  $btnStereo.click(function() {
+    if ($btnStereo.hasClass("down")) {
+      if ($btnStereo.hasClass("stereo")) {
+        $btnStereo.toggleClass("stereo");
+        $btnStereo.toggleClass("down");
         // mono
-        $("#modpaula").html("[mono]");
+        $btnStereo.html("[mono]");
         module.setseparation(2);
         if(typeof(Storage) !== "undefined") localStorage.setItem("modpaula", 2);
       } else {
-        $("#modpaula").toggleClass("stereo");
+        $btnStereo.toggleClass("stereo");
         // normal stereo
-        $("#modpaula").html("[))((]");
+        $btnStereo.html("[))((]");
         module.setseparation(0);
         if(typeof(Storage) !== "undefined") localStorage.setItem("modpaula", 0);
       }
     } else {
-      $("#modpaula").toggleClass("down");
+      $btnStereo.toggleClass("down");
       // narrow stereo
-      $("#modpaula").html("[)oo(]");
+      $btnStereo.html("[)oo(]");
       module.setseparation(1);
       if(typeof(Storage) !== "undefined") localStorage.setItem("modpaula", 1);
     }
     return false;
   });
 
-  $("#modvis").click(function() {
+  $btnVisualizerMode.click(function() {
     var v=(window.moduleVis+1)%3;
     setVisualization(module, v);
     if(typeof(Storage) !== "undefined") localStorage.setItem("modvis", v);
     return false;
   });
 
-  $("#modamiga").click(function() {
-    $("#modamiga").toggleClass("down");
-    if ($("#modamiga").hasClass("down")) {
+  $btnAmigaFilter.click(function() {
+    $btnAmigaFilter.toggleClass("down");
+    if ($btnAmigaFilter.hasClass("down")) {
       module.setamigamodel("500");
       if(typeof(Storage) !== "undefined") localStorage.setItem("modamiga", "500");
     } else {
@@ -496,7 +429,7 @@ $(document).ready(function() {
     }
   });
 
-  $("#load_song").click(function(){
+  $btnShowLoadDialog.click(function(){
     $("#loadercontainer").show();
     $("#innercontainer").hide();
     $("#modfile").focus();
@@ -512,7 +445,7 @@ $(document).ready(function() {
     return false;
   });
 
-  $("#load").click(function(){
+  $btnLoadSelection.click(function(){
     if (module.playing) {
       module.stop();
       module.setautostart(true);
@@ -546,7 +479,7 @@ $(document).ready(function() {
   });
 
   $("#modfile").keypress(function(event) {
-    if (event.keyCode==13) $("#load").click();
+    if (event.keyCode==13) $btnLoadSelection.click();
   });
 
   $("#playlist_remove").click(function(){
@@ -625,7 +558,7 @@ $(document).ready(function() {
     return false;
   });
 
-  $("#next_track").click(function(){
+  $btnNextTrack.click(function(){
     var opt=$("#playlist_box option:selected");
     if (opt.length) {
       var n=$(opt).next("option");
@@ -641,7 +574,7 @@ $(document).ready(function() {
     return false;
   });
 
-  $("#prev_track").click(function(){
+  $btnPrevTrack.click(function(){
     var opt=$("#playlist_box option:selected");
     if (opt.length) {
       var p=$(opt).prev("option");
@@ -664,22 +597,22 @@ $(document).ready(function() {
     if ($("#innercontainer").is(":visible")) {
       if (ev.keyCode==32) { // start/pause playback with space
         if (module.playing) {
-          $("#pause").click();
+          $btnPause.click();
         } else {
-          $("#play").click();
+          $btnPlay.click();
         }
         event.preventDefault(); return false;
       }
       if (ev.keyCode==76) { // 'L' to open loading screen
-        $("#load_song").click();
+        $btnShowLoadDialog.click();
         event.preventDefault(); return false;
       }
       if (ev.keyCode==37) { // left to jump to previous order
-        $("#go_back").click();
+        $btnBack.click();
         event.preventDefault(); return false;
       }
       if (ev.keyCode==39) { // right to jump to next order
-        $("#go_fwd").click();
+        $btnForward.click();
         event.preventDefault(); return false;
       }
     }
@@ -695,31 +628,33 @@ $(document).ready(function() {
 
   // all done, load the song library and default module
   var request = new XMLHttpRequest();
-  request.open("GET", "/musicLibrary.php", true);
-  request.responseType = "json";
+  request.open('GET', '/misc/library.json', true);
+  request.responseType = 'json';
   request.onload = function() {
-    window.musicLibrary=eval(request.response);
+    window.musicLibrary = request.response;
     updateSelectBox(null);
 
-    if (window.defaultComposer != "") {
-      $("#loadfilter").val(window.defaultComposer);
-      updateSelectBox(null);
-      $("#modfile optgroup[label='"+window.defaultComposer+"'] > option:first").attr('selected', 'selected');
-      $("#load_song").click();
-    } else {
-      $('#modfile option[value="'+window.currentModule+'"]').attr('selected', 'selected');
-      if ($("#modfile").val()!="") {
-        var loadInterval=setInterval(function(){
-          if (!module.delayload) {
-             window.currentModule=$("#modfile").val();
-             window.playlistActive=false;
-             module.load(musicPath+$("#modfile").val());
-             clearInterval(loadInterval);
-             showLoaderInfo(module);
-          }
-        }, 200);
+    // get random song from library
+    window.currentModule = getRandomTrack();
+
+    const loadInterval = setInterval(function(){
+      if (!module.delayload) {
+         window.playlistActive = false;
+         module.load(`${musicPath}${currentModule}`);
+         clearInterval(loadInterval);
+         showLoaderInfo(module);
       }
-    }
+    }, 200);
   }
   request.send();
 });
+
+function getRandomTrack() {
+  // get a full list of all tracks
+  let allTracks = [];
+  musicLibrary.forEach(composerData => {
+    allTracks = allTracks.concat(composerData.songs.map(songData => `${composerData.composer}/${songData.file}`));
+  });
+  // return a random one
+  return allTracks[Math.floor(Math.random()*allTracks.length)];
+}
