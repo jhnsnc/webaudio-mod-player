@@ -6,6 +6,8 @@
 var musicPath = '/mods/';
 var musicLibrary = [];
 
+var $mainContainer;
+
 var $patternVisualization;
 var $channelVisualization;
 var $samplesList;
@@ -14,8 +16,8 @@ var $modTitle;
 var $modInfo;
 var $timingContainer;
 
-var $btnPrevTrack;
-var $btnNextTrack;
+// var $btnPrevTrack;
+// var $btnNextTrack;
 var $btnBack;
 var $btnForward;
 var $btnPlay;
@@ -30,6 +32,8 @@ var $btnShowLoadDialog;
 var $btnLoadSelection;
 
 function cacheUiElements() {
+  $mainContainer = $('#innercontainer');
+
   $patternVisualization = $('#modpattern');
   $channelVisualization = $('#modchannels');
   $samplesList = $('#modsamples');
@@ -38,8 +42,8 @@ function cacheUiElements() {
   $modInfo = $('#modinfo');
   $timingContainer = $('#modtimer');
 
-  $btnPrevTrack = $('#prev_track');
-  $btnNextTrack = $('#next_track');
+  // $btnPrevTrack = $('#prev_track');
+  // $btnNextTrack = $('#next_track');
   $btnBack = $('#go_back');
   $btnForward = $('#go_fwd');
   $btnPlay = $('#play');
@@ -89,61 +93,6 @@ function refreshStoredPlaylist()
   }
 }
 
-function playFromPlaylist(module, autostart)
-{
-  module.stopaudio();
-  module.setautostart(autostart);
-  var loadInterval=setInterval(function(){
-    if (!module.delayload) {
-       window.currentModule=$("#playlist_box option:selected").val();
-       window.playlistPosition=$("#playlist_box option").index($("#playlist_box option:selected"));
-       window.playlistActive=true;
-       module.load(musicPath+$("#playlist_box option:selected").val());
-       clearInterval(loadInterval);
-       showLoaderInfo(module);
-    }
-  }, 200);
-}
-
-function updateSelectBox(e)
-{
-  var i, j, f, o="";
-
-  var filter=$("#loadfilter").val().toLowerCase();
-  for(i=0;i<window.musicLibrary.length;i++) {
-    og=""; f=0;
-    if (window.musicLibrary[i].composer=="Unknown") {
-      og+='<optgroup class="'+((i&1)?"odd":"even")+'" label="'+window.musicLibrary[i].composer+'">';
-      for(j=0;j<window.musicLibrary[i].songs.length;j++) {
-        if (filter=="" || window.musicLibrary[i].songs[j].file.toLowerCase().indexOf(filter)>=0) {
-          og+='<option class="'+((i&1)?"odd":"even")+'" value="'+
-            window.musicLibrary[i].songs[j].file+'">'+window.musicLibrary[i].songs[j].file+' '+
-            '<span class="filesize">('+window.musicLibrary[i].songs[j].size+' bytes)</span></option>';
-          f++;
-        }
-      }
-      og+='</optgroup>';
-    } else {
-      og+='<optgroup class="'+((i&1)?"odd":"even")+'" label="'+window.musicLibrary[i].composer+'">';
-      for(j=0;j<window.musicLibrary[i].songs.length;j++) {
-        if (filter=="" ||
-           window.musicLibrary[i].composer.toLowerCase().indexOf(filter)>=0 ||
-           window.musicLibrary[i].songs[j].file.toLowerCase().indexOf(filter)>=0) {
-          og+='<option class="'+((i&1)?"odd":"even")+'" value="'+window.musicLibrary[i].composer+'/'+
-            window.musicLibrary[i].songs[j].file+'">'+window.musicLibrary[i].songs[j].file+' '+
-            '<span class="filesize">('+window.musicLibrary[i].songs[j].size+' bytes)</span></option>';
-          f++;
-        }
-      }
-      og+='</optgroup>';
-    }
-    if (f) o+=og;
-  }
-  $("#modfile").html(o);
-  $("#modfile option").dblclick(function() {
-    $btnLoadSelection.click();
-  });
-}
 
 function setVisualization(mod, v)
 {
@@ -231,6 +180,8 @@ $(document).ready(function() {
   // cache UI elements
   cacheUiElements();
 
+  setupPlaylistUi(); // TODO: move to bottom of ready function
+
   // set up module player
   window.module=new Modplayer();
   window.playlistPosition=0;
@@ -238,327 +189,99 @@ $(document).ready(function() {
 
   setVisualization(null, 1);
 
-  if(typeof(Storage) !== "undefined") {
-    // read previous button states from localStorage
-    if (localStorage["modrepeat"]) {
-      if (localStorage["modrepeat"]=="true") {
-        $btnRepeat.addClass("down");
-        module.setrepeat(true);
-      } else {
-        $btnRepeat.removeClass("down");
-        module.setrepeat(false);
-      }
-    }
-    if (localStorage["modamiga"]) {
-      if (localStorage["modamiga"]=="500") {
-        $btnAmigaFilter.addClass("down");
-        module.setamigamodel("500");
-      } else {
-        $btnAmigaFilter.removeClass("down");
-        module.setamigamodel("1200");
-      }
-    }
-    if (localStorage["modpaula"]) {
-      switch (parseInt(localStorage["modpaula"])) {
-        case 0:
-        $btnStereo.addClass("stereo");
-        $btnStereo.addClass("down");
-        $btnStereo.html("[))((]");
-        module.setseparation(0);
-        break;
+  loadPreferencesFromStorage();
 
-        case 1:
-        $btnStereo.removeClass("stereo");
-        $btnStereo.addClass("down");
-        $btnStereo.html("[)oo(]");
-        module.setseparation(1);
-        break;
+  // module playback events
+  module.addEventListener('ready', handleModuleReady);
+  module.addEventListener('play', handleModulePlay);
+  module.addEventListener('stop', handleModuleStop);
 
-        case 2:
-        $btnStereo.removeClass("stereo");
-        $btnStereo.removeClass("down");
-        $btnStereo.html("[mono]");
-        module.setseparation(2);
-        break;
-      }
-    }
-    if (localStorage["playlist"]) {
-      var playlist=JSON.parse(localStorage["playlist"]);
-      for(i=0;i<playlist.length;i++) addToPlaylist(playlist[i]);
-    }
-    if (localStorage["modvis"])
-      setVisualization(null, parseInt(localStorage["modvis"]));
-  }
-
-  module.addEventListener('ready', function() {
-    $modTitle.html(formatUiString(module.title, 28));
-    $samplesList.html("");
-    for(i=0;i<31;i++)
-      $samplesList.append("<span class=\"samplelist\" id=\"sample"+formatHex(i+1,2)+"\">"+formatHex(i+1,2)+" "+formatUiString(module.samplenames[i], 28)+"</span>\n");
-    $modInfo.html("");
-    $modInfo.append("('"+module.signature+"')");
-    var s=window.currentModule.split("/");
-    var titleString;
-    if (s.length > 1) {
-      titleString = s[1]+" - module player for Web Audio";
-      document.title = titleString;
-      window.history.pushState('', titleString, "/?composer="+s[0]+"&track="+s[1]);
-    } else {
-      titleString = s[0]+" - module player for Web Audio";
-      document.title = titleString;
-      window.history.pushState('', titleString, "/?track="+s[0]);
-    }
-
-    if (window.playlistActive) {
-      $btnPrevTrack.removeClass("inactive");
-      $btnNextTrack.removeClass("inactive");
-    } else {
-      $btnPrevTrack.addClass("inactive");
-      $btnNextTrack.addClass("inactive");
-    }
-
-    $patternVisualization.html(renderPatternData(module.patterns, module.channels, module.patterndata, module));
-    $timingContainer.html("ready.");
-  });
-
-  module.addEventListener('play', function() {
-    $btnPlay.html("[stop]");
-    if (!module.paused) $btnPause.removeClass("down");
-    requestAnimationFrame(updateUI);
-  });
-
-  module.addEventListener('stop', function() {
-    $samplesList.children().removeClass("activesample");
-    $("#even-channels").html("");
-    $("#odd-channels").html("");
-    $(".currentpattern").removeClass("currentpattern");
-    $timingContainer.html("stopped");
-    $btnPlay.html("[play]");
-
-    // if in playlist mode, load next song
-    if (window.playlistActive && module.endofsong) {
-      var opt=$("#playlist_box option:selected");
-      if (opt.length) {
-        var n=$(opt).next("option");
-        if (n.length) {
-          // load next track
-        } else {
-          // jump to first
-          n=$("#playlist_box option:first");
-        }
-        $("#playlist_box").val($(n).val()).change();
-        playFromPlaylist(module, true);
-      }
-    }
-  });
-
+  // button actions
   $btnPlay.click(function(){
     if (module.playing) {
       module.stop();
-      $btnPause.removeClass("down");
-      return false;
-    }
-    module.play();
-    return false;
-  });
-
-  $btnPause.click(function(){
-      $btnPause.toggleClass("down");
-      module.pause();
-      return false;
-  });
-
-  $btnBack.click(function(){
-    module.jump(-1);
-    return false;
-  });
-
-  $btnForward.click(function(){
-    module.jump(1);
-    return false;
-  });
-
-  $btnRepeat.click(function(){
-    $btnRepeat.toggleClass("down");
-    module.setrepeat($btnRepeat.hasClass("down"));
-    if(typeof(Storage) !== "undefined") localStorage.setItem("modrepeat", $btnRepeat.hasClass("down"));
-    return false;
-  });
-
-  $btnStereo.click(function() {
-    if ($btnStereo.hasClass("down")) {
-      if ($btnStereo.hasClass("stereo")) {
-        $btnStereo.toggleClass("stereo");
-        $btnStereo.toggleClass("down");
-        // mono
-        $btnStereo.html("[mono]");
-        module.setseparation(2);
-        if(typeof(Storage) !== "undefined") localStorage.setItem("modpaula", 2);
-      } else {
-        $btnStereo.toggleClass("stereo");
-        // normal stereo
-        $btnStereo.html("[))((]");
-        module.setseparation(0);
-        if(typeof(Storage) !== "undefined") localStorage.setItem("modpaula", 0);
-      }
+      $btnPause.removeClass('down');
     } else {
-      $btnStereo.toggleClass("down");
-      // narrow stereo
-      $btnStereo.html("[)oo(]");
-      module.setseparation(1);
-      if(typeof(Storage) !== "undefined") localStorage.setItem("modpaula", 1);
+      module.play();
     }
-    return false;
   });
-
-  $btnVisualizerMode.click(function() {
-    var v=(window.moduleVis+1)%3;
-    setVisualization(module, v);
-    if(typeof(Storage) !== "undefined") localStorage.setItem("modvis", v);
-    return false;
+  $btnPause.click(() => { $btnPause.toggleClass('down'); module.pause(); });
+  $btnBack.click(() => { module.jump(-1); });
+  $btnForward.click(() => { module.jump(1); });
+  $btnRepeat.click(() => {
+    var val = $btnRepeat.get(0).classList.toggle('down');
+    module.setrepeat(val);
+    savePreference('modrepeat', val);
   });
-
+  $btnStereo.click(toggleStereo);
+  $btnVisualizerMode.click(() => {
+    var val = (window.moduleVis + 1) % 3;
+    setVisualization(module, val);
+    savePreference('modvis', val);
+  });
   $btnAmigaFilter.click(function() {
-    $btnAmigaFilter.toggleClass("down");
-    if ($btnAmigaFilter.hasClass("down")) {
-      module.setamigamodel("500");
-      if(typeof(Storage) !== "undefined") localStorage.setItem("modamiga", "500");
+    if ($btnAmigaFilter.get(0).classList.toggle('down')) {
+      module.setamigamodel('500');
+      savePreference('modamiga', '500');
     } else {
-      module.setamigamodel("1200");
-      if(typeof(Storage) !== "undefined") localStorage.setItem("modamiga", "1200");
+      module.setamigamodel('1200');
+      savePreference('modamiga', '1200');
     }
   });
 
-  $btnShowLoadDialog.click(function(){
-    $("#loadercontainer").show();
-    $("#innercontainer").hide();
-    $("#modfile").focus();
-    var s=document.getElementById("modfile");
-    var i=s.selectedIndex;
-    s[i].selected=false;
-    s[(i<(s.length-12))?(i+12):(s.length-1)].selected=true;
-    s[i].selected=true;
-    return false;
-  });
+  $(document).keyup(handleKeyboardInput);
 
-  $("#loadercontainer").click(function(){
-    return false;
-  });
+  // load track list and preload random song
+  loadMusicLibraryFromJson(true);
+});
 
-  $btnLoadSelection.click(function(){
-    if (module.playing) {
-      module.stop();
-      module.setautostart(true);
-    } else {
-      module.setautostart(false);
-    }
-    $("#loadercontainer").hide();
-    $("#innercontainer").show();
-    var loadInterval=setInterval(function(){
-      if (!module.delayload) {
-         window.currentModule=$("#modfile").val();
-         window.playlistActive=false;
-         module.load(musicPath+$("#modfile").val());
-         clearInterval(loadInterval);
-         showLoaderInfo(module);
-      }
-    }, 200);
-    return false;
-  });
+function handleModuleReady() {
+  $modTitle.html(formatUiString(module.title, 28));
+  $samplesList.html("");
+  for(i=0;i<31;i++)
+    $samplesList.append("<span class=\"samplelist\" id=\"sample"+formatHex(i+1,2)+"\">"+formatHex(i+1,2)+" "+formatUiString(module.samplenames[i], 28)+"</span>\n");
+  $modInfo.html("");
+  $modInfo.append("('"+module.signature+"')");
+  var s=window.currentModule.split("/");
+  var titleString;
+  if (s.length > 1) {
+    titleString = s[1]+" - module player for Web Audio";
+    document.title = titleString;
+    window.history.pushState('', titleString, "/?composer="+s[0]+"&track="+s[1]);
+  } else {
+    titleString = s[0]+" - module player for Web Audio";
+    document.title = titleString;
+    window.history.pushState('', titleString, "/?track="+s[0]);
+  }
 
-  $("#load_cancel").click(function(){
-    $("#loadercontainer").hide();
-    $("#innercontainer").show();
-    return false;
-  });
+  if (window.playlistActive) {
+    $btnPrevTrack.removeClass("inactive");
+    $btnNextTrack.removeClass("inactive");
+  } else {
+    $btnPrevTrack.addClass("inactive");
+    $btnNextTrack.addClass("inactive");
+  }
 
-  $("#add_playlist").click(function(){
-    var song=$("#modfile").val();
-    if (addToPlaylist(song)) refreshStoredPlaylist();
-    return false;
-  });
+  $patternVisualization.html(renderPatternData(module.patterns, module.channels, module.patterndata, module));
+  $timingContainer.html("ready.");
+}
 
-  $("#modfile").keypress(function(event) {
-    if (event.keyCode==13) $btnLoadSelection.click();
-  });
+function handleModulePlay() {
+  $btnPlay.html("[stop]");
+  if (!module.paused) $btnPause.removeClass("down");
+  requestAnimationFrame(updateUI);
+}
 
-  $("#playlist_remove").click(function(){
-    var opt=$("#playlist_box option:selected");
-    if (opt.length) {
-      var song=opt.val();
-      opt.remove();
-      refreshStoredPlaylist();
-    }
-    return false;
-  });
+function handleModuleStop() {
+  $samplesList.children().removeClass("activesample");
+  $("#even-channels").html("");
+  $("#odd-channels").html("");
+  $(".currentpattern").removeClass("currentpattern");
+  $timingContainer.html("stopped");
+  $btnPlay.html("[play]");
 
-  $("#playlist_clear").click(function(){
-    $("#playlist_box").html("");
-    refreshStoredPlaylist();
-    return false;
-  });
-
-  $("#playlist_jumpto").click(function(){
-    var opt=$("#playlist_box option:selected");
-    if (opt.length) {
-      if (module.playing) module.stop();
-      module.setautostart(true);
-      $("#loadercontainer").hide();
-      $("#innercontainer").show();
-      var loadInterval=setInterval(function(){
-        if (!module.delayload) {
-           window.currentModule=$("#playlist_box option:selected").val();
-           window.playlistPosition=$("#playlist_box option").index($("#playlist_box option:selected"));
-           window.playlistActive=true;
-           module.load(musicPath+$("#playlist_box option:selected").val());
-           clearInterval(loadInterval);
-        }
-      }, 200);
-    }
-    return false;
-  });
-
-  $("#playlist_box option").dblclick(function() {
-    $("#playlist_jumpto").click();
-  });
-
-  $("#playlist_up").click(function(){
-    var opt=$("#playlist_box option:selected");
-    if (opt.length) {
-      var p=$(opt).prev("option");
-      if (p.length) {
-        var v=$(p).val();
-        var t=$(p).html();
-        $(p).html($(opt).html());
-        $(p).val($(opt).val());
-        $(opt).html(t);
-        $(opt).val(v);
-        $("#playlist_box").val($(p).val()).change();
-      }
-      refreshStoredPlaylist();
-    }
-    return false;
-  });
-
-  $("#playlist_dn").click(function(){
-    var opt=$("#playlist_box option:selected");
-    if (opt.length) {
-      var n=$(opt).next("option");
-      if (n.length) {
-        var v=$(n).val();
-        var t=$(n).html();
-        $(n).html($(opt).html());
-        $(n).val($(opt).val());
-        $(opt).html(t);
-        $(opt).val(v);
-        $("#playlist_box").val($(n).val()).change();
-      }
-      refreshStoredPlaylist();
-    }
-    return false;
-  });
-
-  $btnNextTrack.click(function(){
+  // if in playlist mode, load next song
+  if (window.playlistActive && module.endofsong) {
     var opt=$("#playlist_box option:selected");
     if (opt.length) {
       var n=$(opt).next("option");
@@ -569,92 +292,32 @@ $(document).ready(function() {
         n=$("#playlist_box option:first");
       }
       $("#playlist_box").val($(n).val()).change();
-      playFromPlaylist(module, module.playing);
+      playFromPlaylist(module, true);
     }
-    return false;
-  });
-
-  $btnPrevTrack.click(function(){
-    var opt=$("#playlist_box option:selected");
-    if (opt.length) {
-      var p=$(opt).prev("option");
-      if (p.length) {
-        // load previous track
-      } else {
-        // jump to last
-        p=$("#playlist_box option:last");
-      }
-      $("#playlist_box").val($(p).val()).change();
-      playFromPlaylist(module, module.playing);
-    }
-    return false;
-  });
-
-  $("#loadfilter").on("input", updateSelectBox);
-
-  $(document).keyup(function(ev){
-    // keyboard shortcuts for main player screen
-    if ($("#innercontainer").is(":visible")) {
-      if (ev.keyCode==32) { // start/pause playback with space
-        if (module.playing) {
-          $btnPause.click();
-        } else {
-          $btnPlay.click();
-        }
-        event.preventDefault(); return false;
-      }
-      if (ev.keyCode==76) { // 'L' to open loading screen
-        $btnShowLoadDialog.click();
-        event.preventDefault(); return false;
-      }
-      if (ev.keyCode==37) { // left to jump to previous order
-        $btnBack.click();
-        event.preventDefault(); return false;
-      }
-      if (ev.keyCode==39) { // right to jump to next order
-        $btnForward.click();
-        event.preventDefault(); return false;
-      }
-    }
-
-    // keyboard shortcuts for load/playlist screen
-    if ($("#loadercontainer").is(":visible")) {
-      if (ev.keyCode==27) {
-        $("#load_cancel").click();
-        event.preventDefault(); return false;
-      }
-    }
-  });
-
-  // all done, load the song library and default module
-  var request = new XMLHttpRequest();
-  request.open('GET', '/mods/library.json', true);
-  request.responseType = 'json';
-  request.onload = function() {
-    window.musicLibrary = request.response;
-    updateSelectBox(null);
-
-    // get random song from library
-    window.currentModule = getRandomTrack();
-
-    const loadInterval = setInterval(function(){
-      if (!module.delayload) {
-         window.playlistActive = false;
-         module.load(`${musicPath}${currentModule}`);
-         clearInterval(loadInterval);
-         showLoaderInfo(module);
-      }
-    }, 200);
   }
-  request.send();
-});
+}
 
-function getRandomTrack() {
-  // get a full list of all tracks
-  let allTracks = [];
-  musicLibrary.forEach(composerData => {
-    allTracks = allTracks.concat(composerData.songs.map(songData => `${composerData.composer}/${songData.file}`));
-  });
-  // return a random one
-  return allTracks[Math.floor(Math.random()*allTracks.length)];
+function toggleStereo() {
+  if ($btnStereo.hasClass('down')) {
+    if ($btnStereo.hasClass('stereo')) {
+      $btnStereo.toggleClass('stereo');
+      $btnStereo.toggleClass('down');
+      // mono
+      $btnStereo.html('[mono]');
+      module.setseparation(2);
+      savePreference('modpaula', 2);
+    } else {
+      $btnStereo.toggleClass('stereo');
+      // normal stereo
+      $btnStereo.html('[))((]');
+      module.setseparation(0);
+      savePreference('modpaula', 0);
+    }
+  } else {
+    $btnStereo.toggleClass('down');
+    // narrow stereo
+    $btnStereo.html('[)oo(]');
+    module.setseparation(1);
+    savePreference('modpaula', 1);
+  }
 }

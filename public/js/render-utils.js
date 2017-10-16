@@ -1,8 +1,7 @@
 
 // constants
-var notelist=new Array('C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-');
-
-var ft2volcmds=new Array('m', 'v', '^', '-', '+', 's', '~', 'p', '&lt;', '&gt;'); // 0x5 .. 0xe
+var notelist = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+var ft2volcmds = ['m', 'v', '^', '-', '+', 's', '~', 'p', '&lt;', '&gt;']; // 0x5 .. 0xe
 
 function formatHex(num, len) { // TODO: maybe allow a toggle for uppercase/lowercase?
   let s = (num || 0).toString(16).padStart(len, '0');

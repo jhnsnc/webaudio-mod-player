@@ -3,6 +3,7 @@
   (c) 2015 firehawk/tda
 */
 
+// Emitter utility class that uses a DOM frag to handle event delegation
 function Emitter() {
   var eventTarget = document.createDocumentFragment();
 
@@ -12,10 +13,12 @@ function Emitter() {
 }
 Emitter.methods = ['addEventListener', 'dispatchEvent', 'removeEventListener'];
 
+
+// the main Modplayer class
 function Modplayer() {
   Emitter.call(this);
 
-  this.supportedformats = new Array('mod', 's3m', 'xm');
+  this.supportedformats = ['mod', 's3m', 'xm'];
 
   this.url = '';
   this.format = 's3m';
@@ -90,19 +93,23 @@ Modplayer.prototype.load = function(url) {
       break;
   }
 
+  // TODO: need to use events instead of this "state" property for messaging
   this.state="loading..";
-  var request = new XMLHttpRequest();
-  request.open("GET", this.url, true);
-  request.responseType = "arraybuffer";
-  this.request = request;
   this.loading=true;
+  // download the requested track
+  this.request = new XMLHttpRequest();
+  this.request.open("GET", this.url, true);
+  this.request.responseType = "arraybuffer";
   var theModPlayer = this;
-  request.onprogress = function(oe) {
+  this.request.onprogress = (oe) => {
+    // TODO: need to use events instead of this "state" property for messaging
     theModPlayer.state="loading ("+Math.floor(100*oe.loaded/oe.total)+"%)..";
   };
-  request.onload = function() {
-    var buffer=new Uint8Array(request.response);
+  this.request.onload = () => {
+    var buffer=new Uint8Array(this.request.response);
+    // TODO: need to use events instead of this "state" property for messaging
     this.state="parsing..";
+    // TODO: possibly change this synchronous parsing to an async/callback model?
     if (theModPlayer.player.parse(buffer)) {
       // copy static data from player
       theModPlayer.title=theModPlayer.player.title
@@ -120,17 +127,18 @@ Modplayer.prototype.load = function(url) {
       } else {
         for(i=0;i<theModPlayer.player.sample.length;i++) theModPlayer.samplenames[i]=theModPlayer.player.sample[i].name;
       }
-
+      // TODO: need to use events instead of this "state" property for messaging
       theModPlayer.state="ready.";
       theModPlayer.loading=false;
       theModPlayer.dispatchEvent(new Event('ready'));
       if (theModPlayer.autostart) theModPlayer.play();
     } else {
+      // TODO: need to use events instead of this "state" property for messaging
       theModPlayer.state="error!";
       theModPlayer.loading=false;
     }
   }
-  request.send();
+  this.request.send();
   return true;
 }
 
