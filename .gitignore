@@ -1,5 +1,4 @@
 .htaccess
 mods
 public/mods
-public/misc/library.json
 node_modules

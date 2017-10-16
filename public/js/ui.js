@@ -628,7 +628,7 @@ $(document).ready(function() {
 
   // all done, load the song library and default module
   var request = new XMLHttpRequest();
-  request.open('GET', '/misc/library.json', true);
+  request.open('GET', '/mods/library.json', true);
   request.responseType = 'json';
   request.onload = function() {
     window.musicLibrary = request.response;
