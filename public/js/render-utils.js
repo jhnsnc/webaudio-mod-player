@@ -119,3 +119,11 @@ function renderChannelLevel(level) { // TODO: replace this with a pixel/canvas e
 
   return result;
 }
+
+function renderTimingBar(module) {
+  return `pos <span class=\"hl\">${formatHex(module.position,2)}</span>/<span class=\"hl\">${formatHex(module.songlen,2)}</span> `+
+    `row <span class=\"hl\">${formatHex(module.row,2)}</span>/<span class=\"hl\">${formatHex(module.currentpattlen()-1,2)}</span> `+
+    `speed <span class=\"hl\">${module.speed}</span> `+
+    `bpm <span class=\"hl\">${module.bpm}</span> `+
+    `filter <span class=\"hl\">${(module.filter ? 'on' : 'off')}</span>`;
+}

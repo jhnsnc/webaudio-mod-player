@@ -7,36 +7,83 @@ var musicPath = '/mods/';
 var musicLibrary = [];
 
 var $mainContainer;
-
-var $patternVisualization;
-var $channelVisualization;
-var $samplesList;
-
-var $modTitle;
-var $modInfo;
-var $timingContainer;
-
-// var $btnPrevTrack;
-// var $btnNextTrack;
-var $btnBack;
-var $btnForward;
-var $btnPlay;
-var $btnPause;
-
-var $btnRepeat;
-var $btnStereo;
-var $btnAmigaFilter;
-var $btnVisualizerMode;
-var $btnShowLoadDialog;
-
+var $patternVisualization, $channelVisualization, $samplesList;
+var $modTitle, $modInfo, $timingContainer;
+// var $btnPrevTrack, $btnNextTrack;
+var $btnBack, $btnForward, $btnPlay, $btnPause;
+var $btnRepeat, $btnStereo, $btnAmigaFilter, $btnVisualizerMode, $btnShowLoadDialog;
 var $btnLoadSelection;
 
-function cacheUiElements() {
+function showLoaderInfo(module) {
+  // TODO: change to an event listener approach
+  window.loaderInterval=setInterval(function(){
+    if (module.loading) {
+      $timingContainer.html(module.state);
+    } else {
+      clearInterval(window.loaderInterval);
+    }
+  }, 20);
+}
+
+var oldpos = -1, oldrow = -1;
+var lastframe = -1;
+function updateUI(timestamp) {
+  // maintain 25hz frame rate for the UI
+  if ((timestamp-lastframe) < 40) {
+    requestAnimationFrame(updateUI);
+    return;
+  }
+  lastframe = timestamp;
+
+  var i,c;
+
+  if (module.playing) {
+    if (window.moduleVis==2) {
+      // update channel visualization
+      var txt, txt0="<br/>", txt1="<br/>";
+      for(ch=0;ch<module.channels;ch++) {
+        txt='<span class="channelnr">'+formatHex(ch,2)+'</span> ['+renderChannelLevel(module.chvu[ch])+'] '+
+            '<span class="hl">'+formatHex(module.currentsample(ch),2)+'</span>:<span class="channelsample">'+formatUiString(module.samplenames[module.currentsample(ch)], 28)+"</span><br/>";
+        if (ch&1) txt0+=txt; else txt1+=txt;
+      }
+      $("#even-channels").html(txt0);
+      $("#odd-channels").html(txt1);
+    } else if (window.moduleVis==1) {
+      // update pattern visualization
+      if (oldpos>=0 && oldrow>=0) $(".currentrow").removeClass("currentrow");
+      $("#pattern"+formatHex(module.currentpattern(),2)+"_row"+formatHex(module.row,2)).addClass("currentrow");
+      $("#pattern"+formatHex(module.currentpattern(),2)).scrollTop(module.row*16);
+      if (oldpos != module.position) {
+        if (oldpos>=0) $(".currentpattern").removeClass("currentpattern");
+        $("#pattern"+formatHex(module.currentpattern(),2)).addClass("currentpattern");
+      }
+    }
+
+    if (oldrow != module.row || oldpos != module.position) {
+      // update timing
+      $timingContainer.html(renderTimingBar(module));
+      // update samples
+      $samplesList.forEach(el => { el.removeClass('activesample'); });
+      for(c=0; c<module.channels; c++)
+        if (module.noteon(c))
+          $samplesList[module.currentsample(c)].addClass('activesample');
+    }
+    oldpos=module.position;
+    oldrow=module.row;
+  }
+  // TODO: stop looping update when modplayer is stopped
+  requestAnimationFrame(updateUI);
+}
+
+
+$(document).ready(function() {
+  var i;
+
+  // cache UI elements
   $mainContainer = $('#innercontainer');
 
   $patternVisualization = $('#modpattern');
   $channelVisualization = $('#modchannels');
-  $samplesList = $('#modsamples');
 
   $modTitle = $('#modtitle');
   $modInfo = $('#modinfo');
@@ -56,130 +103,17 @@ function cacheUiElements() {
   $btnShowLoadDialog = $('#load_song');
 
   $btnLoadSelection = $('#load');
-}
 
-function showLoaderInfo(module)
-{
-  window.loaderInterval=setInterval(function(){
-    if (module.loading) {
-      $timingContainer.html(module.state);
-    } else {
-      clearInterval(window.loaderInterval);
-    }
-  }, 20);
-}
-
-function addToPlaylist(song)
-{
-  var dupe=false;
-  $("#playlist_box option").each(function(o) {
-    if ($(this).val() == song) dupe=true;
-  });
-  if (!dupe) {
-    var optclass=($("#playlist_box option").length & 1) ? "odd" : "even";
-    $("#playlist_box").append("<option class=\""+optclass+"\" value=\""+song+"\">"+song+"</option>");
+  // setup samples list
+  var el;
+  $samplesList = [];
+  for (i=0; i<31; i++) {
+    el = $(`<div class=\"samplelist\" id=\"sample${formatHex(i+1,2)}\">${formatHex(i+1,2)} ${formatUiString('', 28)}</div>`);
+    $samplesList.push(el);
+    $('#modsamples').append(el);
   }
-  return !dupe;
-}
 
-function refreshStoredPlaylist()
-{
-  if(typeof(Storage) !== "undefined") {
-    var playlist=[];
-    $("#playlist_box option").each(function(o) {
-      playlist.push($(this).val());
-    });
-    localStorage["playlist"]=JSON.stringify(playlist);
-  }
-}
-
-
-function setVisualization(mod, v)
-{
-  var visNames=['[none]', '[trks]', '[chvu]'];
-  switch (v) {
-    case 0: // show none
-      $btnVisualizerMode.removeClass("down");
-      $(".currentpattern").removeClass("currentpattern");
-      $channelVisualization.hide();
-      break;
-
-    case 1: // show pattern data
-      $btnVisualizerMode.addClass("down");
-      if (mod && mod.playing) $("#pattern"+formatHex(mod.currentpattern(),2)).addClass("currentpattern");
-      $channelVisualization.hide();
-      break;
-
-    case 2: // show channel output
-      $btnVisualizerMode.addClass("down");
-      $(".currentpattern").removeClass("currentpattern");
-      $channelVisualization.show();
-      break;
-  }
-  $btnVisualizerMode.html(visNames[v]);
-  window.moduleVis=v;
-}
-
-
-var oldpos=-1, oldrow=-1;
-
-var lastframe=-1;
-function updateUI(timestamp)
-{
-  // maintain 25hz frame rate for the UI
-  if ((timestamp-lastframe) < 40) {
-    requestAnimationFrame(updateUI);
-    return;
-  }
-  lastframe=timestamp;
-
-  var i,c;
-  var mod=window.module;
-
-  if (mod.playing) {
-    if (window.moduleVis==2) {
-      var txt, txt0="<br/>", txt1="<br/>";
-      for(ch=0;ch<mod.channels;ch++) {
-        txt='<span class="channelnr">'+formatHex(ch,2)+'</span> ['+renderChannelLevel(mod.chvu[ch])+'] '+
-            '<span class="hl">'+formatHex(mod.currentsample(ch),2)+'</span>:<span class="channelsample">'+formatUiString(mod.samplenames[mod.currentsample(ch)], 28)+"</span><br/>";
-        if (ch&1) txt0+=txt; else txt1+=txt;
-      }
-      $("#even-channels").html(txt0);
-      $("#odd-channels").html(txt1);
-    } else if (window.moduleVis==1) {
-      if (oldpos>=0 && oldrow>=0) $(".currentrow").removeClass("currentrow");
-      $("#pattern"+formatHex(mod.currentpattern(),2)+"_row"+formatHex(mod.row,2)).addClass("currentrow");
-      $("#pattern"+formatHex(mod.currentpattern(),2)).scrollTop(mod.row*16);
-      if (oldpos != mod.position) {
-        if (oldpos>=0) $(".currentpattern").removeClass("currentpattern");
-        $("#pattern"+formatHex(mod.currentpattern(),2)).addClass("currentpattern");
-      }
-    }
-
-    if (oldrow != mod.row || oldpos != mod.position) {
-      $timingContainer.replaceWith("<span id=\"modtimer\">"+
-        "pos <span class=\"hl\">"+formatHex(mod.position,2)+"</span>/<span class=\"hl\">"+formatHex(mod.songlen,2)+"</span> "+
-        "row <span class=\"hl\">"+formatHex(mod.row,2)+"</span>/<span class=\"hl\">"+formatHex(mod.currentpattlen()-1,2)+"</span> "+
-        "speed <span class=\"hl\">"+mod.speed+"</span> "+
-        "bpm <span class=\"hl\">"+mod.bpm+"</span> "+
-        "filter <span class=\"hl\">"+(mod.filter ? "on" : "off")+"</span>"+
-        "</span>");
-
-      $samplesList.children().removeClass("activesample");
-      for(c=0;c<mod.channels;c++)
-        if (mod.noteon(c)) $("#sample"+formatHex(mod.currentsample(c)+1,2)).addClass("activesample");
-    }
-    oldpos=mod.position;
-    oldrow=mod.row;
-  }
-  requestAnimationFrame(updateUI);
-}
-
-
-$(document).ready(function() {
-  // cache UI elements
-  cacheUiElements();
-
+  // playlist
   setupPlaylistUi(); // TODO: move to bottom of ready function
 
   // set up module player
@@ -237,9 +171,12 @@ $(document).ready(function() {
 
 function handleModuleReady() {
   $modTitle.html(formatUiString(module.title, 28));
-  $samplesList.html("");
-  for(i=0;i<31;i++)
-    $samplesList.append("<span class=\"samplelist\" id=\"sample"+formatHex(i+1,2)+"\">"+formatHex(i+1,2)+" "+formatUiString(module.samplenames[i], 28)+"</span>\n");
+
+  // set samples
+  $samplesList.forEach((el, idx) => {
+    el.html(idx<module.samplenames.length ? `${formatHex(idx+1,2)} ${formatUiString(module.samplenames[idx], 28)}` : `${formatHex(idx+1,2)} ${formatUiString('', 28)}`);
+  });
+
   $modInfo.html("");
   $modInfo.append("('"+module.signature+"')");
   var s=window.currentModule.split("/");
@@ -267,13 +204,15 @@ function handleModuleReady() {
 }
 
 function handleModulePlay() {
-  $btnPlay.html("[stop]");
-  if (!module.paused) $btnPause.removeClass("down");
+  $btnPlay.html('[stop]');
+  if (!module.paused) {
+    $btnPause.removeClass('down');
+  }
   requestAnimationFrame(updateUI);
 }
 
 function handleModuleStop() {
-  $samplesList.children().removeClass("activesample");
+  $samplesList.forEach(el => { el.removeClass('activesample'); });
   $("#even-channels").html("");
   $("#odd-channels").html("");
   $(".currentpattern").removeClass("currentpattern");
@@ -320,4 +259,29 @@ function toggleStereo() {
     module.setseparation(1);
     savePreference('modpaula', 1);
   }
+}
+
+function setVisualization(mod, val) {
+  var visNames = ['[none]', '[trks]', '[chvu]'];
+  switch (val) {
+    case 0: // show none
+      $btnVisualizerMode.removeClass("down");
+      $(".currentpattern").removeClass("currentpattern");
+      $channelVisualization.hide();
+      break;
+
+    case 1: // show pattern data
+      $btnVisualizerMode.addClass("down");
+      if (mod && mod.playing) $("#pattern"+formatHex(mod.currentpattern(),2)).addClass("currentpattern");
+      $channelVisualization.hide();
+      break;
+
+    case 2: // show channel output
+      $btnVisualizerMode.addClass("down");
+      $(".currentpattern").removeClass("currentpattern");
+      $channelVisualization.show();
+      break;
+  }
+  $btnVisualizerMode.html(visNames[val]);
+  window.moduleVis = val;
 }

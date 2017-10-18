@@ -212,3 +212,26 @@ function updateSelectBox(e) {
   });
 }
 
+function addToPlaylist(song) {
+  var dupe=false;
+  $("#playlist_box option").each(function(o) {
+    if ($(this).val() == song) dupe=true;
+  });
+  if (!dupe) {
+    var optclass=($("#playlist_box option").length & 1) ? "odd" : "even";
+    $("#playlist_box").append("<option class=\""+optclass+"\" value=\""+song+"\">"+song+"</option>");
+  }
+  return !dupe;
+}
+
+function refreshStoredPlaylist()
+{
+  if(typeof(Storage) !== "undefined") {
+    var playlist=[];
+    $("#playlist_box option").each(function(o) {
+      playlist.push($(this).val());
+    });
+    localStorage["playlist"]=JSON.stringify(playlist);
+  }
+}
+
