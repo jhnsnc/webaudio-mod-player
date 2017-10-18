@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "build": "curl -L http://cjdevsite.com/misc/tech-demos/webaudio-mod-player-mods-master.tar.gz | tar xz && mv webaudio-mod-player-mods-master/* public/mods && rm webaudio-mod-player-mods-master/ -r",
+    "start": "node app.js"
+  },
   "dependencies": {
     "node-static": "^0.7.10"
   }
