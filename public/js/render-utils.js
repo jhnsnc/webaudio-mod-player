@@ -101,25 +101,6 @@ function renderPatternData(numPatterns, numChannels, getPatternData, context) {
 }
 
 
-function renderChannelLevel(level) { // TODO: replace this with a pixel/canvas equivalent
-  const n = Math.round(level*20);
-  let result = '';
-  let i;
-
-  result = '<span style=\"color:#afa;\">';
-  for(i=0;i<10;i++)
-    result += (i<n) ? '&#x00BB;' : '&nbsp;';
-  result += '</span><span style="color:#fea;">';
-  for(;i<16;i++)
-    result += (i<n) ? '&#x00BB;' : '&nbsp;';
-  result += '</span><span style="color:#faa;">';
-  for(;i<20;i++)
-    result += (i<n) ? '&#x00BB;' : '&nbsp;';
-  result += '</span>';
-
-  return result;
-}
-
 function renderTimingBar(module) {
   return `pos <span class=\"hl\">${formatHex(module.position,2)}</span>/<span class=\"hl\">${formatHex(module.songlen,2)}</span> `+
     `row <span class=\"hl\">${formatHex(module.row,2)}</span>/<span class=\"hl\">${formatHex(module.currentpattlen()-1,2)}</span> `+

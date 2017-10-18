@@ -3,11 +3,14 @@
   (c) 2012-2015 firehawk/tda
 */
 
+var stats;
+
 var musicPath = '/mods/';
 var musicLibrary = [];
 
 var $mainContainer;
-var $patternVisualization, $channelVisualization, $samplesList;
+var $patternVisualization, patterns;
+var $channelVisualization, $channelsList, $samplesList;
 var $modTitle, $modInfo, $timingContainer;
 // var $btnPrevTrack, $btnNextTrack;
 var $btnBack, $btnForward, $btnPlay, $btnPause;
@@ -28,34 +31,37 @@ function showLoaderInfo(module) {
 var oldpos = -1, oldrow = -1;
 var lastframe = -1;
 function updateUI(timestamp) {
+  // console.log('update UI');
+
   // maintain 25hz frame rate for the UI
   if ((timestamp-lastframe) < 40) {
     requestAnimationFrame(updateUI);
     return;
   }
+
+  stats.begin(); // stats
+
   lastframe = timestamp;
 
-  var i,c;
+  var i, c;
 
   if (module.playing) {
-    if (window.moduleVis==2) {
+    if (window.moduleVis == 2) {
       // update channel visualization
-      var txt, txt0="<br/>", txt1="<br/>";
-      for(ch=0;ch<module.channels;ch++) {
-        txt='<span class="channelnr">'+formatHex(ch,2)+'</span> ['+renderChannelLevel(module.chvu[ch])+'] '+
-            '<span class="hl">'+formatHex(module.currentsample(ch),2)+'</span>:<span class="channelsample">'+formatUiString(module.samplenames[module.currentsample(ch)], 28)+"</span><br/>";
-        if (ch&1) txt0+=txt; else txt1+=txt;
+      for(ch=0; ch<module.channels; ch++) {
+        $channelsList[ch].eq.get(0).dataset.level = Math.round(module.chvu[ch]*20);
+        $channelsList[ch].sampleId.html(formatHex(module.currentsample(ch)+1, 2));
+        $channelsList[ch].sampleName.html(formatUiString(module.samplenames[module.currentsample(ch)], 28));
+        $channelVisualization.append($channelsList[ch].el);
       }
-      $("#even-channels").html(txt0);
-      $("#odd-channels").html(txt1);
-    } else if (window.moduleVis==1) {
+    } else if (window.moduleVis == 1) {
       // update pattern visualization
-      if (oldpos>=0 && oldrow>=0) $(".currentrow").removeClass("currentrow");
-      $("#pattern"+formatHex(module.currentpattern(),2)+"_row"+formatHex(module.row,2)).addClass("currentrow");
-      $("#pattern"+formatHex(module.currentpattern(),2)).scrollTop(module.row*16);
+      if (oldpos>=0 && oldrow>=0) $('.currentrow').removeClass('currentrow');
+      patterns[module.currentpattern()].rows.eq(module.row).addClass('currentrow');
+      patterns[module.currentpattern()].el.scrollTop(module.row*16);
       if (oldpos != module.position) {
-        if (oldpos>=0) $(".currentpattern").removeClass("currentpattern");
-        $("#pattern"+formatHex(module.currentpattern(),2)).addClass("currentpattern");
+        if (oldpos>=0) $('.currentpattern').removeClass('currentpattern');
+        patterns[module.currentpattern()].el.addClass('currentpattern');
       }
     }
 
@@ -68,22 +74,36 @@ function updateUI(timestamp) {
         if (module.noteon(c))
           $samplesList[module.currentsample(c)].addClass('activesample');
     }
-    oldpos=module.position;
-    oldrow=module.row;
+
+    oldpos = module.position;
+    oldrow = module.row;
   }
-  // TODO: stop looping update when modplayer is stopped
-  requestAnimationFrame(updateUI);
+
+  if (module.playing) {
+    requestAnimationFrame(updateUI);
+  }
+  stats.end(); // stats
 }
 
 
 $(document).ready(function() {
   var i;
 
+  // setup stats
+  stats = new Stats();
+  stats.showPanel(0);
+  stats.domElement.style.position = 'absolute';
+  stats.domElement.style.left = stats.domElement.style.top = 0;
+  document.body.appendChild(stats.domElement);
+
   // cache UI elements
   $mainContainer = $('#innercontainer');
 
   $patternVisualization = $('#modpattern');
+  patterns = [];
   $channelVisualization = $('#modchannels');
+  $channelsList = [];
+  $samplesList = [];
 
   $modTitle = $('#modtitle');
   $modInfo = $('#modinfo');
@@ -106,7 +126,6 @@ $(document).ready(function() {
 
   // setup samples list
   var el;
-  $samplesList = [];
   for (i=0; i<31; i++) {
     el = $(`<div class=\"samplelist\" id=\"sample${formatHex(i+1,2)}\">${formatHex(i+1,2)} ${formatUiString('', 28)}</div>`);
     $samplesList.push(el);
@@ -170,6 +189,8 @@ $(document).ready(function() {
 });
 
 function handleModuleReady() {
+  console.log('module ready');
+
   $modTitle.html(formatUiString(module.title, 28));
 
   // set samples
@@ -200,10 +221,46 @@ function handleModuleReady() {
   }
 
   $patternVisualization.html(renderPatternData(module.patterns, module.channels, module.patterndata, module));
-  $timingContainer.html("ready.");
+  patterns = [];
+  $patternVisualization.find('.patterndata').each((idx, el) => {
+    patterns.push({
+      el: $(el),
+      rows: $(el).find('.patternrow')
+    });
+  });
+  $timingContainer.html('ready.');
 }
 
 function handleModulePlay() {
+  console.log('module play');
+
+  // setup channel details
+  var ch, i, el;
+  $channelsList = [];
+  var eqStr = '';
+  for(i=1; i<=20; i++) {
+    eqStr += `<span class="pip-${i}">&#x00BB;</span>`;
+  }
+  for(ch=0; ch<module.channels; ch++) {
+    el = $(`<span class="channel-details"><span class="channelnr">${formatHex(ch,2)}</span> [<span class="eq">${eqStr}</span>] `+
+      `<span class="hl sample-id">${formatHex(0,2)}</span>:<span class="sample-name">${formatUiString('', 28)}</span></span>`);
+    $channelsList.push({
+      el: el,
+      eq: el.find('.eq'),
+      sampleId: el.find('.sample-id'),
+      sampleName: el.find('.sample-name'),
+    });
+  }
+  $channelVisualization.empty();
+  $channelVisualization.append('<br/>');
+  for(ch=0; ch<module.channels; ch++) {
+    $channelsList[ch].eq.get(0).dataset.level = 0;
+    $channelsList[ch].sampleId.html(formatHex(module.currentsample(ch)+1, 2));
+    $channelsList[ch].sampleName.html(formatUiString(module.samplenames[module.currentsample(ch)], 28));
+    $channelVisualization.append($channelsList[ch].el);
+  }
+
+  // play
   $btnPlay.html('[stop]');
   if (!module.paused) {
     $btnPause.removeClass('down');
@@ -212,9 +269,14 @@ function handleModulePlay() {
 }
 
 function handleModuleStop() {
+  console.log('module stop');
+
   $samplesList.forEach(el => { el.removeClass('activesample'); });
-  $("#even-channels").html("");
-  $("#odd-channels").html("");
+
+  // clear channels visualization
+  $channelVisualization.empty();
+  $channelsList = [];
+
   $(".currentpattern").removeClass("currentpattern");
   $timingContainer.html("stopped");
   $btnPlay.html("[play]");
@@ -265,20 +327,20 @@ function setVisualization(mod, val) {
   var visNames = ['[none]', '[trks]', '[chvu]'];
   switch (val) {
     case 0: // show none
-      $btnVisualizerMode.removeClass("down");
-      $(".currentpattern").removeClass("currentpattern");
+      $btnVisualizerMode.removeClass('down');
+      $('.currentpattern').removeClass('currentpattern');
       $channelVisualization.hide();
       break;
 
     case 1: // show pattern data
-      $btnVisualizerMode.addClass("down");
-      if (mod && mod.playing) $("#pattern"+formatHex(mod.currentpattern(),2)).addClass("currentpattern");
+      $btnVisualizerMode.addClass('down');
+      if (mod && mod.playing) patterns[module.currentpattern()].el.addClass('currentpattern');
       $channelVisualization.hide();
       break;
 
     case 2: // show channel output
-      $btnVisualizerMode.addClass("down");
-      $(".currentpattern").removeClass("currentpattern");
+      $btnVisualizerMode.addClass('down');
+      $('.currentpattern').removeClass('currentpattern');
       $channelVisualization.show();
       break;
   }
