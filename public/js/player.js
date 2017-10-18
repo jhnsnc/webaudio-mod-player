@@ -393,7 +393,7 @@ Modplayer.prototype.createContext = function() {
 
 
 // scriptnode callback - pass through to player class
-Modplayer.prototype.mix = function(ape) {
+Modplayer.prototype.mix = function(ape) { // NOTE: ape = AudioProcessEvent
   var mod;
 
   if (ape.srcElement) {
