@@ -8,158 +8,161 @@
 
 */
 
+function Emitter() {
+  var eventTarget = document.createDocumentFragment();
+
+  Emitter.methods.forEach(function(method) {
+    this[method] = eventTarget[method].bind(eventTarget);
+  }, this);
+}
+Emitter.methods = ['addEventListener', 'dispatchEvent', 'removeEventListener'];
+
+
 // constructor for protracker player object
-function Protracker()
-{
-  var i, t;
+function Protracker() {
+  Emitter.call(this);
 
-  this.clearsong();
-  this.initialize();
+  this.init();
+  this.reset();
 
-  this.playing=false;
-  this.paused=false;
-  this.repeat=false;
+  this.playing = false;
+  this.paused = false;
+  this.repeat = false;
 
-  this.filter=false;
+  this.filter = false;
 
-  this.mixval=4.0;
+  this.mixval = 4.0;
 
-  this.syncqueue=[];
+  this.syncqueue = [];
 
-  this.samplerate=44100;
+  this.samplerate = 44100;
 
   // paula period values
-  this.baseperiodtable=new Float32Array([
+  this.baseperiodtable = new Float32Array([
     856,808,762,720,678,640,604,570,538,508,480,453,
     428,404,381,360,339,320,302,285,269,254,240,226,
-    214,202,190,180,170,160,151,143,135,127,120,113]);
+    214,202,190,180,170,160,151,143,135,127,120,113
+  ]);
 
   // finetune multipliers
-  this.finetunetable=new Float32Array(16);
-  for(t=0;t<16;t++) this.finetunetable[t]=Math.pow(2, (t-8)/12/8);
+  this.finetunetable = new Float32Array(16).map((x,i)=>Math.pow(2,(i-8)/12/8));
 
   // calc tables for vibrato waveforms
-  this.vibratotable=new Array();
-  for(t=0;t<4;t++) {
-    this.vibratotable[t]=new Float32Array(64);
-    for(i=0;i<64;i++) {
-      switch(t) {
-        case 0:
-          this.vibratotable[t][i]=127*Math.sin(Math.PI*2*(i/64));
-          break;
-        case 1:
-          this.vibratotable[t][i]=127-4*i;
-          break;
-        case 2:
-          this.vibratotable[t][i]=(i<32)?127:-127;
-          break;
-        case 3:
-          this.vibratotable[t][i]=(1-2*Math.random())*127;
-          break;
-      }
-    }
-  }
+  this.vibratotable = [
+    new Float32Array(64).map((x,i)=>127*Math.sin(2*Math.PI*i/64)),
+    new Float32Array(64).map((x,i)=>127-4*i),
+    new Float32Array(64).map((x,i)=>i<32?127:-127),
+    new Float32Array(64).map((x,i)=>(1-2*Math.random())*127),
+  ];
 
   // effect jumptables
-  this.effects_t0 = new Array(
+  this.effects_t0 = [
     this.effect_t0_0, this.effect_t0_1, this.effect_t0_2, this.effect_t0_3, this.effect_t0_4, this.effect_t0_5, this.effect_t0_6, this.effect_t0_7,
-    this.effect_t0_8, this.effect_t0_9, this.effect_t0_a, this.effect_t0_b, this.effect_t0_c, this.effect_t0_d, this.effect_t0_e, this.effect_t0_f);
-  this.effects_t0_e = new Array(
+    this.effect_t0_8, this.effect_t0_9, this.effect_t0_a, this.effect_t0_b, this.effect_t0_c, this.effect_t0_d, this.effect_t0_e, this.effect_t0_f,
+  ];
+  this.effects_t0_e = [
     this.effect_t0_e0, this.effect_t0_e1, this.effect_t0_e2, this.effect_t0_e3, this.effect_t0_e4, this.effect_t0_e5, this.effect_t0_e6, this.effect_t0_e7,
-    this.effect_t0_e8, this.effect_t0_e9, this.effect_t0_ea, this.effect_t0_eb, this.effect_t0_ec, this.effect_t0_ed, this.effect_t0_ee, this.effect_t0_ef);
-  this.effects_t1 = new Array(
+    this.effect_t0_e8, this.effect_t0_e9, this.effect_t0_ea, this.effect_t0_eb, this.effect_t0_ec, this.effect_t0_ed, this.effect_t0_ee, this.effect_t0_ef,
+  ];
+  this.effects_t1 = [
     this.effect_t1_0, this.effect_t1_1, this.effect_t1_2, this.effect_t1_3, this.effect_t1_4, this.effect_t1_5, this.effect_t1_6, this.effect_t1_7,
-    this.effect_t1_8, this.effect_t1_9, this.effect_t1_a, this.effect_t1_b, this.effect_t1_c, this.effect_t1_d, this.effect_t1_e, this.effect_t1_f);
-  this.effects_t1_e = new Array(
+    this.effect_t1_8, this.effect_t1_9, this.effect_t1_a, this.effect_t1_b, this.effect_t1_c, this.effect_t1_d, this.effect_t1_e, this.effect_t1_f,
+  ];
+  this.effects_t1_e = [
     this.effect_t1_e0, this.effect_t1_e1, this.effect_t1_e2, this.effect_t1_e3, this.effect_t1_e4, this.effect_t1_e5, this.effect_t1_e6, this.effect_t1_e7,
-    this.effect_t1_e8, this.effect_t1_e9, this.effect_t1_ea, this.effect_t1_eb, this.effect_t1_ec, this.effect_t1_ed, this.effect_t1_ee, this.effect_t1_ef);
+    this.effect_t1_e8, this.effect_t1_e9, this.effect_t1_ea, this.effect_t1_eb, this.effect_t1_ec, this.effect_t1_ed, this.effect_t1_ee, this.effect_t1_ef,
+  ];
 }
 
 
 
 // clear song data
-Protracker.prototype.clearsong = function()
-{
-  this.title="";
-  this.signature="";
+Protracker.prototype.init = function() {
+  var i;
 
-  this.songlen=1;
-  this.repeatpos=0;
-  this.patterntable=new ArrayBuffer(128);
-  for(i=0;i<128;i++) this.patterntable[i]=0;
+  this.title = '';
+  this.signature = '';
 
-  this.channels=4;
+  this.songlen = 1;
+  this.repeatpos = 0;
+  this.patterntable = new ArrayBuffer(128);
+  for(i=0; i<128; i++) this.patterntable[i]=0;
 
-  this.sample=new Array();
-  this.samples=31;
-  for(i=0;i<31;i++) {
-    this.sample[i]=new Object();
-    this.sample[i].name="";
-    this.sample[i].length=0;
-    this.sample[i].finetune=0;
-    this.sample[i].volume=64;
-    this.sample[i].loopstart=0;
-    this.sample[i].looplength=0;
-    this.sample[i].data=0;
+  this.channels = 4;
+
+  this.samples = 31;
+  this.sample = [];
+  for(i=0; i<this.samples; i++) {
+    this.sample.push({
+      name: '',
+      length: 0,
+      finetune: 0,
+      volume: 64,
+      loopstart: 0,
+      looplength: 0,
+      data: 0,
+    });
   }
 
-  this.patterns=0;
-  this.pattern=new Array();
-  this.note=new Array();
-  this.pattern_unpack=new Array();
+  this.patterns = 0;
+  this.pattern = [];
+  this.note = [];
+  this.pattern_unpack = [];
 
-  this.looprow=0;
-  this.loopstart=0;
-  this.loopcount=0;
+  this.looprow = 0;
+  this.loopstart = 0;
+  this.loopcount = 0;
 
-  this.patterndelay=0;
-  this.patternwait=0;
+  this.patterndelay = 0;
+  this.patternwait = 0;
 }
 
 
-// initialize all player variables
-Protracker.prototype.initialize = function()
-{
-  this.syncqueue=[];
+// reset all player variables
+Protracker.prototype.reset = function() {
+  var i;
 
-  this.tick=0;
-  this.position=0;
-  this.row=0;
-  this.offset=0;
-  this.flags=0;
+  this.syncqueue = [];
 
-  this.speed=6;
-  this.bpm=125;
-  this.breakrow=0;
-  this.patternjump=0;
-  this.patterndelay=0;
-  this.patternwait=0;
-  this.endofsong=false;
+  this.tick = 0;
+  this.position = 0;
+  this.row = 0;
+  this.offset = 0;
+  this.flags = 0;
 
-  this.channel=new Array();
-  for(i=0;i<this.channels;i++) {
-    this.channel[i]=new Object();
-    this.channel[i].sample=0;
-    this.channel[i].period=214;
-    this.channel[i].voiceperiod=214;
-    this.channel[i].note=24;
-    this.channel[i].volume=64;
-    this.channel[i].command=0;
-    this.channel[i].data=0;
-    this.channel[i].samplepos=0;
-    this.channel[i].samplespeed=0;
-    this.channel[i].flags=0;
-    this.channel[i].noteon=0;
-    this.channel[i].slidespeed=0;
-    this.channel[i].slideto=214;
-    this.channel[i].slidetospeed=0;
-    this.channel[i].arpeggio=0;
+  this.speed = 6;
+  this.bpm = 125;
+  this.breakrow = 0;
+  this.patternjump = 0;
+  this.patterndelay = 0;
+  this.patternwait = 0;
+  this.endofsong = false;
 
-    this.channel[i].semitone=12;
-    this.channel[i].vibratospeed=0
-    this.channel[i].vibratodepth=0
-    this.channel[i].vibratopos=0;
-    this.channel[i].vibratowave=0;
+  this.channel = [];
+  for(i=0; i<this.channels; i++) {
+    this.channel[i] = {
+      sample: 0,
+      period: 214,
+      voiceperiod: 214,
+      note: 24,
+      volume: 64,
+      command: 0,
+      data: 0,
+      samplepos: 0,
+      samplespeed: 0,
+      flags: 0,
+      noteon: 0,
+      slidespeed: 0,
+      slideto: 214,
+      slidetospeed: 0,
+      arpeggio: 0,
+
+      semitone: 12,
+      vibratospeed: 0,
+      vibratodepth: 0,
+      vibratopos: 0,
+      vibratowave: 0,
+    };
   }
 }
 
@@ -170,45 +173,46 @@ Protracker.prototype.parse = function(buffer)
 {
   var i,j,c;
 
-  for(i=0;i<4;i++) this.signature+=String.fromCharCode(buffer[1080+i]);
+  this.signature = '';
+  for(i=0; i<4; i++) this.signature+=String.fromCharCode(buffer[1080+i]);
   switch (this.signature) {
-    case "M.K.":
-    case "M!K!":
-    case "4CHN":
-    case "FLT4":
+    case 'M.K.':
+    case 'M!K!':
+    case '4CHN':
+    case 'FLT4':
       break;
 
-    case "6CHN":
+    case '6CHN':
       this.channels=6;
       break;
 
-    case "8CHN":
-    case "FLT8":
+    case '8CHN':
+    case 'FLT8':
       this.channels=8;
       break;
 
-    case "28CH":
+    case '28CH':
       this.channels=28;
       break;
 
     default:
       return false;
   }
-  this.chvu=new Array();
-  for(i=0;i<this.channels;i++) this.chvu[i]=0.0;
+  this.chvu = [];
+  for(i=0; i<this.channels; i++) this.chvu[i]=0.0;
 
   i=0;
   while(buffer[i] && i<20)
     this.title=this.title+String.fromCharCode(buffer[i++]);
 
-  for(i=0;i<this.samples;i++) {
+  for(i=0; i<this.samples; i++) {
     var st=20+i*30;
     j=0;
     while(buffer[st+j] && j<22) {
       this.sample[i].name+=
         ((buffer[st+j]>0x1f) && (buffer[st+j]<0x7f)) ?
         (String.fromCharCode(buffer[st+j])) :
-        (" ");
+        (' ');
       j++;
     }
     this.sample[i].length=2*(buffer[st+22]*256 + buffer[st+23]);
@@ -226,33 +230,36 @@ Protracker.prototype.parse = function(buffer)
 
   this.songlen=buffer[950];
   if (buffer[951] != 127) this.repeatpos=buffer[951];
-  for(i=0;i<128;i++) {
+  for(i=0; i<128; i++) {
     this.patterntable[i]=buffer[952+i];
     if (this.patterntable[i] > this.patterns) this.patterns=this.patterntable[i];
   }
   this.patterns+=1;
   var patlen=4*64*this.channels;
 
-  this.pattern=new Array();
-  this.note=new Array();
-  this.pattern_unpack=new Array();
-  for(i=0;i<this.patterns;i++) {
+  this.pattern = [];
+  this.note = [];
+  this.pattern_unpack = [];
+  for(i=0; i<this.patterns; i++) {
     this.pattern[i]=new Uint8Array(patlen);
     this.note[i]=new Uint8Array(this.channels*64);
     this.pattern_unpack[i]=new Uint8Array(this.channels*64*5);
-    for(j=0;j<patlen;j++) this.pattern[i][j]=buffer[1084+i*patlen+j];
-    for(j=0;j<64;j++) for(c=0;c<this.channels;c++) {
+    for(j=0; j<patlen; j++) this.pattern[i][j]=buffer[1084+i*patlen+j];
+    for(j=0; j<64; j++) for(c=0;c<this.channels;c++) {
       this.note[i][j*this.channels+c]=0;
       var n=(this.pattern[i][j*4*this.channels+c*4]&0x0f)<<8 | this.pattern[i][j*4*this.channels+c*4+1];
       for(var np=0; np<this.baseperiodtable.length; np++)
         if (n==this.baseperiodtable[np]) this.note[i][j*this.channels+c]=np;
     }
-    for(j=0;j<64;j++) {
-      for(c=0;c<this.channels;c++) {
+    for(j=0; j<64; j++) {
+      for(c=0; c<this.channels; c++) {
         var pp= j*4*this.channels+c*4;
         var ppu=j*5*this.channels+c*5;
         var n=(this.pattern[i][pp]&0x0f)<<8 | this.pattern[i][pp+1];
-        if (n) { n=this.note[i][j*this.channels+c]; n=(n%12)|(Math.floor(n/12)+2)<<4; }
+        if (n) {
+          n=this.note[i][j*this.channels+c];
+          n=(n%12)|(Math.floor(n/12)+2)<<4;
+        }
         this.pattern_unpack[i][ppu+0]=(n)?n:255;
         this.pattern_unpack[i][ppu+1]=this.pattern[i][pp+0]&0xf0 | this.pattern[i][pp+2]>>4;
         this.pattern_unpack[i][ppu+2]=255;
@@ -263,7 +270,7 @@ Protracker.prototype.parse = function(buffer)
   }
 
   var sst=1084+this.patterns*patlen;
-  for(i=0;i<this.samples;i++) {
+  for(i=0; i<this.samples; i++) {
     this.sample[i].data=new Float32Array(this.sample[i].length);
     for(j=0;j<this.sample[i].length;j++) {
       var q=buffer[sst+j];
@@ -279,7 +286,7 @@ Protracker.prototype.parse = function(buffer)
 
   // look ahead at very first row to see if filter gets enabled
   this.filter=false;
-  for(var ch=0;ch<this.channels;ch++)
+  for(var ch=0; ch<this.channels; ch++)
   {
     p=this.patterntable[0];
     pp=ch*4;
@@ -302,8 +309,7 @@ Protracker.prototype.parse = function(buffer)
     }
   }
 
-  this.chvu=new Float32Array(this.channels);
-  for(i=0;i<this.channels;i++) this.chvu[i]=0.0;
+  this.chvu = new Float32Array(this.channels).map(()=>0.0);
 
   return true;
 }

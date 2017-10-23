@@ -159,7 +159,7 @@ Modplayer.prototype.play = function() {
     this.endofsong=false;
     this.player.endofsong=false;
     this.player.paused=false;
-    this.player.initialize();
+    this.player.reset();
     this.player.flags=1+2;
     this.player.playing=true;
     this.playing=true;

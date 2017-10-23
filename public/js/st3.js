@@ -12,8 +12,8 @@ function Screamtracker()
 {
   var i, t;
 
-  this.clearsong();
-  this.initialize();
+  this.init();
+  this.reset();
 
   this.playing=false;
   this.paused=false;
@@ -104,7 +104,7 @@ function Screamtracker()
 
 
 // clear song data
-Screamtracker.prototype.clearsong = function()
+Screamtracker.prototype.init = function()
 {
   var i;
 
@@ -155,8 +155,8 @@ Screamtracker.prototype.clearsong = function()
 
 
 
-// initialize all player variables to defaults prior to starting playback
-Screamtracker.prototype.initialize = function()
+// reset all player variables to defaults prior to starting playback
+Screamtracker.prototype.reset = function()
 {
   this.syncqueue=[];
 
