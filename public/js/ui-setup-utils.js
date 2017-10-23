@@ -93,7 +93,7 @@ function handleKeyboardInput(evt) {
 }
 
 
-function loadMusicLibraryFromJson(playRandom) {
+function loadMusicLibraryFromJson(autoloadTrack) {
   // all done, load the song library and default module
   var request = new XMLHttpRequest();
   request.open('GET', '/mods/library.json', true);
@@ -102,7 +102,10 @@ function loadMusicLibraryFromJson(playRandom) {
     window.musicLibrary = request.response;
     updateSelectBox(null);
 
-    if (playRandom) {
+    console.log('autoload! ', autoloadTrack);
+    if (typeof autoloadTrack === 'string') {
+      playTrack(autoloadTrack, false);
+    } else if (typeof autoloadTrack === 'boolean' && autoloadTrack) {
       playRandomTrack(false);
     }
   }

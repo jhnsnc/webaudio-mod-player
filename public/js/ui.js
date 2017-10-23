@@ -185,7 +185,14 @@ $(document).ready(function() {
   $(document).keyup(handleKeyboardInput);
 
   // load track list and preload random song
-  loadMusicLibraryFromJson(true);
+  var params = (new URL(window.location)).searchParams;
+  var composer = params.get('composer');
+  var track = params.get('track');
+  if (composer && composer.length && track && track.length) {
+    loadMusicLibraryFromJson(`${composer}/${track}`);
+  } else {
+    loadMusicLibraryFromJson(true);
+  }
 });
 
 function handleModuleReady() {
