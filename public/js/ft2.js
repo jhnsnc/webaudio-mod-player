@@ -138,8 +138,8 @@ Fasttracker.prototype.init = function()
   this.initSpeed=6;
   this.initBPM=125;
 
-  this.patterntable=new ArrayBuffer(256);
-  for(i=0;i<256;i++) this.patterntable[i]=0;
+  this.patternSequence=new ArrayBuffer(256);
+  for(i=0;i<256;i++) this.patternSequence[i]=0;
 
   this.pattern=new Array();
   this.instrument=new Array(this.instruments);
@@ -270,8 +270,8 @@ Fasttracker.prototype.parse = function(buffer)
 
   var maxpatt=0;
   for(i=0;i<256;i++) {
-    this.patterntable[i]=buffer[offset+20+i];
-    if (this.patterntable[i]>maxpatt) maxpatt=this.patterntable[i];
+    this.patternSequence[i]=buffer[offset+20+i];
+    if (this.patternSequence[i]>maxpatt) maxpatt=this.patternSequence[i];
   }
   maxpatt++;
 
@@ -587,7 +587,7 @@ Fasttracker.prototype.advance = function(mod) {
   }
 
   // step to new pattern?
-  if (mod.row>=mod.patternlen[mod.patterntable[mod.position]]) {
+  if (mod.row>=mod.patternlen[mod.patternSequence[mod.position]]) {
     mod.position++;
     mod.row=0;
     mod.flags|=4;
@@ -708,7 +708,7 @@ Fasttracker.prototype.process_tick = function(mod) {
   for(var ch=0;ch<mod.channels;ch++) {
 
     // calculate playback position
-    var p=mod.patterntable[mod.position];
+    var p=mod.patternSequence[mod.position];
     var pp=mod.row*5*mod.channels + ch*5;
 
     // save old volume if ramping is needed
@@ -1182,7 +1182,7 @@ Fasttracker.prototype.effect_t0_ec=function(mod, ch) { // ec
 }
 Fasttracker.prototype.effect_t0_ed=function(mod, ch) { // ed delay sample
   if (mod.tick==(mod.channel[ch].data&0x0f)) {
-    mod.process_note(mod, mod.patterntable[mod.position], ch);
+    mod.process_note(mod, mod.patternSequence[mod.position], ch);
   }
 }
 Fasttracker.prototype.effect_t0_ee=function(mod, ch) { // ee delay pattern

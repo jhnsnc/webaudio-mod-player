@@ -2,6 +2,11 @@
   protracker module player for web audio api
   (c) 2012-2015 firehawk/tda  (firehawk@haxor.fi)
 
+  reference:
+  - http://www.aes.id.au/modformat.html
+  - https://www.ocf.berkeley.edu/~eek/index.html/tiny_examples/ptmod/ap12.html
+  - https://wiki.multimedia.cx/index.php/Protracker_Module
+
   todo:
   - pattern looping is broken (see mod.black_queen)
   - properly test EEx delay pattern
@@ -85,8 +90,8 @@ Protracker.prototype.init = function() {
 
   this.songlen = 1;
   this.repeatpos = 0;
-  this.patterntable = new ArrayBuffer(128);
-  for(i=0; i<128; i++) this.patterntable[i]=0;
+  this.patternSequence = new ArrayBuffer(128);
+  for(i=0; i<128; i++) this.patternSequence[i] = 0;
 
   this.channels = 4;
 
@@ -120,8 +125,6 @@ Protracker.prototype.init = function() {
 
 // reset all player variables
 Protracker.prototype.reset = function() {
-  var i;
-
   this.syncqueue = [];
 
   this.tick = 0;
@@ -139,8 +142,8 @@ Protracker.prototype.reset = function() {
   this.endofsong = false;
 
   this.channel = [];
-  for(i=0; i<this.channels; i++) {
-    this.channel[i] = {
+  for(var i=0; i<this.channels; i++) {
+    this.channel.push({
       sample: 0,
       period: 214,
       voiceperiod: 214,
@@ -162,81 +165,83 @@ Protracker.prototype.reset = function() {
       vibratodepth: 0,
       vibratopos: 0,
       vibratowave: 0,
-    };
+    });
   }
 }
 
 
 
 // parse the module from local buffer
-Protracker.prototype.parse = function(buffer)
-{
+// buffier should be type Uint8Array
+Protracker.prototype.parse = function(buffer) {
   var i,j,c;
 
-  this.signature = '';
-  for(i=0; i<4; i++) this.signature+=String.fromCharCode(buffer[1080+i]);
+  // signature and channels init
+  this.signature = stringFromBuffer(buffer, 1080, 4);
   switch (this.signature) {
     case 'M.K.':
     case 'M!K!':
     case '4CHN':
     case 'FLT4':
       break;
-
     case '6CHN':
       this.channels=6;
       break;
-
     case '8CHN':
     case 'FLT8':
       this.channels=8;
       break;
-
     case '28CH':
       this.channels=28;
       break;
-
     default:
-      return false;
+      return false; // invalid signature
   }
-  this.chvu = [];
-  for(i=0; i<this.channels; i++) this.chvu[i]=0.0;
+  this.chvu = new Array(this.channels).fill(0.0);
 
-  i=0;
-  while(buffer[i] && i<20)
-    this.title=this.title+String.fromCharCode(buffer[i++]);
+  // title
+  this.title = stringFromBuffer(buffer, 0, 20, {
+    stopAt: b=>!b
+  });
 
+  // samples
   for(i=0; i<this.samples; i++) {
-    var st=20+i*30;
-    j=0;
-    while(buffer[st+j] && j<22) {
-      this.sample[i].name+=
-        ((buffer[st+j]>0x1f) && (buffer[st+j]<0x7f)) ?
-        (String.fromCharCode(buffer[st+j])) :
-        (' ');
-      j++;
-    }
-    this.sample[i].length=2*(buffer[st+22]*256 + buffer[st+23]);
-    this.sample[i].finetune=buffer[st+24];
-    if (this.sample[i].finetune > 7) this.sample[i].finetune=this.sample[i].finetune-16;
-    this.sample[i].volume=buffer[st+25];
-    this.sample[i].loopstart=2*(buffer[st+26]*256 + buffer[st+27]);
-    this.sample[i].looplength=2*(buffer[st+28]*256 + buffer[st+29]);
-    if (this.sample[i].looplength==2) this.sample[i].looplength=0;
-    if (this.sample[i].loopstart>this.sample[i].length) {
-      this.sample[i].loopstart=0;
-      this.sample[i].looplength=0;
+    var sampleStart = 20 +i*30;
+
+    this.sample[i].name = stringFromBuffer(buffer, sampleStart, 22, {
+      stopAt: b=>!b,
+      interpretByte: b=>b>0x1f&&b<0x7f ? String.fromCharCode(b) : ' ',
+    });
+
+    this.sample[i].length = 2*numFromBuffer(buffer, sampleStart+22, 2);
+
+    this.sample[i].finetune = buffer[sampleStart+24];
+    if (this.sample[i].finetune > 7)
+      this.sample[i].finetune = this.sample[i].finetune - 16;
+
+    this.sample[i].volume = buffer[sampleStart+25];
+
+    this.sample[i].loopstart = 2*numFromBuffer(buffer, sampleStart+26, 2);
+    this.sample[i].looplength = 2*numFromBuffer(buffer, sampleStart+28, 2);
+    if (this.sample[i].looplength == 2)
+      this.sample[i].looplength = 0;
+    if (this.sample[i].loopstart > this.sample[i].length) {
+      this.sample[i].loopstart = 0;
+      this.sample[i].looplength = 0;
     }
   }
 
-  this.songlen=buffer[950];
-  if (buffer[951] != 127) this.repeatpos=buffer[951];
+  // song sequence (pattern order), length, repeat/loop point
+  this.songlen = buffer[950];
+  this.repeatpos = (buffer[951] != 127) ? buffer[951] : 0;
   for(i=0; i<128; i++) {
-    this.patterntable[i]=buffer[952+i];
-    if (this.patterntable[i] > this.patterns) this.patterns=this.patterntable[i];
+    this.patternSequence[i] = buffer[952+i];
+    // num patterns = the latest referenced pattern in the song sequence
+    this.patterns = Math.max(this.patterns, this.patternSequence[i] + 1);
   }
-  this.patterns+=1;
-  var patlen=4*64*this.channels;
 
+  // pattern data (individual notes for each pattern)
+  var patlen = 4*64*this.channels; // 4 bytes per note, 64 beat per pattern, one note per channel per beat
   this.pattern = [];
   this.note = [];
   this.pattern_unpack = [];
@@ -269,6 +274,7 @@ Protracker.prototype.parse = function(buffer)
     }
   }
 
+  // sample data (actual sample content)
   var sst=1084+this.patterns*patlen;
   for(i=0; i<this.samples; i++) {
     this.sample[i].data=new Float32Array(this.sample[i].length);
@@ -288,7 +294,7 @@ Protracker.prototype.parse = function(buffer)
   this.filter=false;
   for(var ch=0; ch<this.channels; ch++)
   {
-    p=this.patterntable[0];
+    p=this.patternSequence[0];
     pp=ch*4;
     var cmd=this.pattern[p][pp+2]&0x0f, data=this.pattern[p][pp+3];
     if (cmd==0x0e && ((data&0xf0)==0x00)) {
@@ -388,7 +394,7 @@ Protracker.prototype.mix = function(mod, bufs, buflen) {
       {
 
         // calculate playback position
-        p=mod.patterntable[mod.position];
+        p=mod.patternSequence[mod.position];
         pp=mod.row*4*mod.channels + ch*4;
         if (mod.flags&2) { // new row
           mod.channel[ch].command=mod.pattern[p][pp+2]&0x0f;
@@ -612,7 +618,7 @@ Protracker.prototype.effect_t0_ec=function(mod, ch) { // ec
 Protracker.prototype.effect_t0_ed=function(mod, ch) { // ed delay sample
   if (mod.tick==(mod.channel[ch].data&0x0f)) {
     // start note
-    var p=mod.patterntable[mod.position];
+    var p=mod.patternSequence[mod.position];
     var pp=mod.row*4*mod.channels + ch*4;
     n=(mod.pattern[p][pp]&0x0f)<<8 | mod.pattern[p][pp+1];
     if (n) {

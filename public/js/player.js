@@ -106,7 +106,7 @@ Modplayer.prototype.load = function(url) {
     theModPlayer.state="loading ("+Math.floor(100*oe.loaded/oe.total)+"%)..";
   };
   this.request.onload = () => {
-    var buffer=new Uint8Array(this.request.response);
+    var buffer = new Uint8Array(this.request.response);
     // TODO: need to use events instead of this "state" property for messaging
     this.state="parsing..";
     // TODO: possibly change this synchronous parsing to an async/callback model?
@@ -284,7 +284,7 @@ Modplayer.prototype.popsyncevent = function() {
 
 // ger current pattern number
 Modplayer.prototype.currentpattern = function() {
-  if (this.player) return this.player.patterntable[this.player.position];
+  if (this.player) return this.player.patternSequence[this.player.position];
 }
 
 
@@ -349,7 +349,7 @@ Modplayer.prototype.currentsample = function(ch) {
 // get length of currently playing pattern
 Modplayer.prototype.currentpattlen = function() {
   if (this.format=="mod" || this.format=="s3m") return 64;
-  return this.player.patternlen[this.player.patterntable[this.player.position]];
+  return this.player.patternlen[this.player.patternSequence[this.player.position]];
 }
 
 

@@ -12,6 +12,28 @@ function s_le_word(buffer, offset) {
   return (le_word(buffer,offset)<32768)?le_word(buffer,offset):(le_word(buffer,offset)-65536);
 }
 
+// buffer utils
+function stringFromBuffer(buffer, start, length, options = {}) {
+  var result = '';
+  // stopAt = a check to see if the string stops at a certain pt (e.g. nulled bytes)
+  var stopAt = options.stopAt || (()=>false);
+  // interpretByte = how to interpret and convert each byte to substring
+  var interpretByte = options.interpretByte || (b=>String.fromCharCode(b));
+  for (var i=0; i<length; i++) {
+    if (stopAt(buffer[start+i])) { return result; }
+    result += interpretByte(buffer[start+i]);
+  }
+  return result;
+}
+function numFromBuffer(buffer, start, length) {
+  var result = 0;
+  for (var i=0; i<length; i++) {
+    result *= 0x100;
+    result += buffer[start+i];
+  }
+  return result;
+}
+
 // convert from MS-DOS extended ASCII to Unicode
 function dos2utf(c) {
   if (c<128) return String.fromCharCode(c);

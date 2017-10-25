@@ -113,8 +113,8 @@ Screamtracker.prototype.init = function()
 
   this.songlen=1;
   this.repeatpos=0;
-  this.patterntable=new ArrayBuffer(256);
-  for(i=0;i<256;i++) this.patterntable[i]=0;
+  this.patternSequence=new ArrayBuffer(256);
+  for(i=0;i<256;i++) this.patternSequence[i]=0;
 
   this.channels=0;
   this.ordNum=0;
@@ -291,8 +291,8 @@ Screamtracker.prototype.parse = function(buffer)
   this.mixval=128.0/Math.max(0x10, this.mixval&0x7f); // (8.0 when mastervol is 0x10, 1.0 when mastervol is 0x7f)
 
   // load orders
-  for(i=0;i<this.ordNum;i++) this.patterntable[i]=buffer[0x0060+i];
-  for(this.songlen=0,i=0;i<this.ordNum;i++) if (this.patterntable[i]!=255) this.songlen++;
+  for(i=0;i<this.ordNum;i++) this.patternSequence[i]=buffer[0x0060+i];
+  for(this.songlen=0,i=0;i<this.ordNum;i++) if (this.patternSequence[i]!=255) this.songlen++;
 
   // load instruments
   this.sample=new Array(this.insNum);
@@ -347,7 +347,7 @@ Screamtracker.prototype.parse = function(buffer)
         ch=c&31;
         if (ch<this.channels) {
           if (ch>max_ch) {
-            for(j=0;j<this.songlen;j++) if (this.patterntable[j]==i)
+            for(j=0;j<this.songlen;j++) if (this.patternSequence[j]==i)
               max_ch=ch; // only if pattern is actually used
           }
           if (c&32) {
@@ -444,11 +444,11 @@ Screamtracker.prototype.advance = function(mod) {
     mod.position++;
     mod.row=0;
     mod.flags|=4;
-    while (mod.patterntable[mod.position]==254) mod.position++; // skip markers
+    while (mod.patternSequence[mod.position]==254) mod.position++; // skip markers
   }
 
   // end of song?
-  if (mod.position>=mod.songlen || mod.patterntable[mod.position]==255) {
+  if (mod.position>=mod.songlen || mod.patternSequence[mod.position]==255) {
     if (mod.repeat) {
       mod.position=0;
     } else {
@@ -523,7 +523,7 @@ Screamtracker.prototype.process_tick = function(mod) {
   for(var ch=0;ch<mod.channels;ch++) {
 
     // calculate playback position
-    var p=mod.patterntable[mod.position];
+    var p=mod.patternSequence[mod.position];
     var pp=mod.row*5*mod.channels + ch*5;
 
     mod.channel[ch].oldvoicevolume=mod.channel[ch].voicevolume;
@@ -822,7 +822,7 @@ Screamtracker.prototype.effect_t0_sc=function(mod, ch) { // note cut
 }
 Screamtracker.prototype.effect_t0_sd=function(mod, ch) { // note delay
   if (mod.tick==(mod.channel[ch].data&0x0f)) {
-    mod.process_note(mod, mod.patterntable[mod.position], ch);
+    mod.process_note(mod, mod.patternSequence[mod.position], ch);
   }
 }
 Screamtracker.prototype.effect_t0_se=function(mod, ch) { // pattern delay
