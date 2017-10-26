@@ -33,6 +33,12 @@ function numFromBuffer(buffer, start, length) {
   }
   return result;
 }
+function copyFromBuffer(buffer, target, start, length) {
+  for (var i=0; i<length; i++) {
+    target[i] = buffer[start+i];
+  }
+  return target;
+}
 
 // convert from MS-DOS extended ASCII to Unicode
 function dos2utf(c) {

@@ -295,9 +295,10 @@ Modplayer.prototype.currentpattern = function() {
 // command: 0x2e=no command, 0..0x24=effect command
 // data: 0..255
 Modplayer.prototype.patterndata = function(pn) {
+  // TODO: should return a Note object rather than a Uint8Array?
   var i, c, patt;
   if (this.format=='mod') {
-    patt=new Uint8Array(this.player.pattern_unpack[pn]);
+    patt=new Uint8Array(this.player.patternDataUnpacked[pn]);
     for(i=0;i<64;i++) for(c=0;c<this.player.channels;c++) {
       if (patt[i*5*this.channels+c*5+3]==0 && patt[i*5*this.channels+c*5+4]==0) {
         patt[i*5*this.channels+c*5+3]=0x2e;

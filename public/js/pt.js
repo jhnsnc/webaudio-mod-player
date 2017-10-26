@@ -110,9 +110,9 @@ Protracker.prototype.init = function() {
   }
 
   this.patterns = 0;
-  this.pattern = [];
+  this.patternDataRaw = [];
   this.note = [];
-  this.pattern_unpack = [];
+  this.patternDataUnpacked = [];
 
   this.looprow = 0;
   this.loopstart = 0;
@@ -195,7 +195,7 @@ Protracker.prototype.parse = function(buffer) {
       this.channels=28;
       break;
     default:
-      return false; // invalid signature
+      return false; // invalid signature // TODO: throw error message
   }
   this.chvu = new Array(this.channels).fill(0.0);
 
@@ -242,34 +242,38 @@ Protracker.prototype.parse = function(buffer) {
 
   // pattern data (individual notes for each pattern)
   var patlen = 4*64*this.channels; // 4 bytes per note, 64 beat per pattern, one note per channel per beat
-  this.pattern = [];
+  this.patternDataRaw = [];
   this.note = [];
-  this.pattern_unpack = [];
+  this.patternDataUnpacked = [];
   for(i=0; i<this.patterns; i++) {
-    this.pattern[i]=new Uint8Array(patlen);
-    this.note[i]=new Uint8Array(this.channels*64);
-    this.pattern_unpack[i]=new Uint8Array(this.channels*64*5);
-    for(j=0; j<patlen; j++) this.pattern[i][j]=buffer[1084+i*patlen+j];
+    this.patternDataUnpacked[i]=new Uint8Array(this.channels*64*5);
+
+    // copy pattern data from raw buffer
+    this.patternDataRaw[i] = copyFromBuffer(buffer, new Uint8Array(patlen), 1084+i*patlen, patlen);
+
+    // for each channel, set the notes from raw pattern data
+    this.note[i] = new Uint8Array(this.channels*64);
     for(j=0; j<64; j++) for(c=0;c<this.channels;c++) {
       this.note[i][j*this.channels+c]=0;
-      var n=(this.pattern[i][j*4*this.channels+c*4]&0x0f)<<8 | this.pattern[i][j*4*this.channels+c*4+1];
+      var n=(this.patternDataRaw[i][j*4*this.channels+c*4]&0x0f)<<8 | this.patternDataRaw[i][j*4*this.channels+c*4+1];
       for(var np=0; np<this.baseperiodtable.length; np++)
         if (n==this.baseperiodtable[np]) this.note[i][j*this.channels+c]=np;
     }
+
     for(j=0; j<64; j++) {
       for(c=0; c<this.channels; c++) {
         var pp= j*4*this.channels+c*4;
         var ppu=j*5*this.channels+c*5;
-        var n=(this.pattern[i][pp]&0x0f)<<8 | this.pattern[i][pp+1];
+        var n=(this.patternDataRaw[i][pp]&0x0f)<<8 | this.patternDataRaw[i][pp+1];
         if (n) {
           n=this.note[i][j*this.channels+c];
           n=(n%12)|(Math.floor(n/12)+2)<<4;
         }
-        this.pattern_unpack[i][ppu+0]=(n)?n:255;
-        this.pattern_unpack[i][ppu+1]=this.pattern[i][pp+0]&0xf0 | this.pattern[i][pp+2]>>4;
-        this.pattern_unpack[i][ppu+2]=255;
-        this.pattern_unpack[i][ppu+3]=this.pattern[i][pp+2]&0x0f;
-        this.pattern_unpack[i][ppu+4]=this.pattern[i][pp+3];
+        this.patternDataUnpacked[i][ppu+0]=(n)?n:255;
+        this.patternDataUnpacked[i][ppu+1]=this.patternDataRaw[i][pp+0]&0xf0 | this.patternDataRaw[i][pp+2]>>4;
+        this.patternDataUnpacked[i][ppu+2]=255;
+        this.patternDataUnpacked[i][ppu+3]=this.patternDataRaw[i][pp+2]&0x0f;
+        this.patternDataUnpacked[i][ppu+4]=this.patternDataRaw[i][pp+3];
       }
     }
   }
@@ -296,7 +300,7 @@ Protracker.prototype.parse = function(buffer) {
   {
     p=this.patternSequence[0];
     pp=ch*4;
-    var cmd=this.pattern[p][pp+2]&0x0f, data=this.pattern[p][pp+3];
+    var cmd=this.patternDataRaw[p][pp+2]&0x0f, data=this.patternDataRaw[p][pp+3];
     if (cmd==0x0e && ((data&0xf0)==0x00)) {
       if (!(data&0x01)) {
         this.filter=true;
@@ -397,11 +401,11 @@ Protracker.prototype.mix = function(mod, bufs, buflen) {
         p=mod.patternSequence[mod.position];
         pp=mod.row*4*mod.channels + ch*4;
         if (mod.flags&2) { // new row
-          mod.channel[ch].command=mod.pattern[p][pp+2]&0x0f;
-          mod.channel[ch].data=mod.pattern[p][pp+3];
+          mod.channel[ch].command=mod.patternDataRaw[p][pp+2]&0x0f;
+          mod.channel[ch].data=mod.patternDataRaw[p][pp+3];
 
           if (!(mod.channel[ch].command==0x0e && (mod.channel[ch].data&0xf0)==0xd0)) {
-            n=(mod.pattern[p][pp]&0x0f)<<8 | mod.pattern[p][pp+1];
+            n=(mod.patternDataRaw[p][pp]&0x0f)<<8 | mod.patternDataRaw[p][pp+1];
             if (n) {
               // noteon, except if command=3 (porta to note)
               if ((mod.channel[ch].command != 0x03) && (mod.channel[ch].command != 0x05)) {
@@ -414,7 +418,7 @@ Protracker.prototype.mix = function(mod, bufs, buflen) {
               // in either case, set the slide to note target
               mod.channel[ch].slideto=n;
             }
-            nn=mod.pattern[p][pp+0]&0xf0 | mod.pattern[p][pp+2]>>4;
+            nn=mod.patternDataRaw[p][pp+0]&0xf0 | mod.patternDataRaw[p][pp+2]>>4;
             if (nn) {
               mod.channel[ch].sample=nn-1;
               mod.channel[ch].volume=mod.sample[nn-1].volume;
@@ -620,7 +624,7 @@ Protracker.prototype.effect_t0_ed=function(mod, ch) { // ed delay sample
     // start note
     var p=mod.patternSequence[mod.position];
     var pp=mod.row*4*mod.channels + ch*4;
-    n=(mod.pattern[p][pp]&0x0f)<<8 | mod.pattern[p][pp+1];
+    n=(mod.patternDataRaw[p][pp]&0x0f)<<8 | mod.patternDataRaw[p][pp+1];
     if (n) {
       mod.channel[ch].period=n;
       mod.channel[ch].voiceperiod=mod.channel[ch].period;
@@ -629,7 +633,7 @@ Protracker.prototype.effect_t0_ed=function(mod, ch) { // ed delay sample
       mod.channel[ch].flags|=3; // recalc speed
       mod.channel[ch].noteon=1;
     }
-    n=mod.pattern[p][pp+0]&0xf0 | mod.pattern[p][pp+2]>>4;
+    n=mod.patternDataRaw[p][pp+0]&0xf0 | mod.patternDataRaw[p][pp+2]>>4;
     if (n) {
       mod.channel[ch].sample=n-1;
       mod.channel[ch].volume=mod.sample[n-1].volume;
