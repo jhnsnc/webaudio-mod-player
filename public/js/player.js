@@ -299,12 +299,14 @@ Modplayer.prototype.patterndata = function(pn) {
   var i, c, patt;
   if (this.format=='mod') {
     patt=new Uint8Array(this.player.patternDataUnpacked[pn]);
-    for(i=0;i<64;i++) for(c=0;c<this.player.channels;c++) {
-      if (patt[i*5*this.channels+c*5+3]==0 && patt[i*5*this.channels+c*5+4]==0) {
-        patt[i*5*this.channels+c*5+3]=0x2e;
-      } else {
-        patt[i*5*this.channels+c*5+3]+=0x37;
-        if (patt[i*5*this.channels+c*5+3]<0x41) patt[i*5*this.channels+c*5+3]-=0x07;
+    for(i=0; i<64; i++) { // each beat step
+      for(c=0; c<this.player.channels; c++) { // each channel
+        if (patt[i*5*this.channels+c*5+3]==0 && patt[i*5*this.channels+c*5+4]==0) {
+          patt[i*5*this.channels+c*5+3]=0x2e;
+        } else {
+          patt[i*5*this.channels+c*5+3]+=0x37;
+          if (patt[i*5*this.channels+c*5+3]<0x41) patt[i*5*this.channels+c*5+3]-=0x07;
+        }
       }
     }
   } else if (this.format=='s3m') {

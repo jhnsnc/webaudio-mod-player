@@ -111,7 +111,6 @@ Protracker.prototype.init = function() {
 
   this.patterns = 0;
   this.patternDataRaw = [];
-  this.note = [];
   this.patternDataUnpacked = [];
 
   this.looprow = 0;
@@ -205,24 +204,25 @@ Protracker.prototype.parse = function(buffer) {
   });
 
   // samples
+  var sampleOffset;
   for(i=0; i<this.samples; i++) {
-    var sampleStart = 20 +i*30;
+    sampleOffset = 20 +i*30;
 
-    this.sample[i].name = stringFromBuffer(buffer, sampleStart, 22, {
+    this.sample[i].name = stringFromBuffer(buffer, sampleOffset, 22, {
       stopAt: b=>!b,
       interpretByte: b=>b>0x1f&&b<0x7f ? String.fromCharCode(b) : ' ',
     });
 
-    this.sample[i].length = 2*numFromBuffer(buffer, sampleStart+22, 2);
+    this.sample[i].length = 2*numFromBuffer(buffer, sampleOffset+22, 2);
 
-    this.sample[i].finetune = buffer[sampleStart+24];
+    this.sample[i].finetune = buffer[sampleOffset+24];
     if (this.sample[i].finetune > 7)
       this.sample[i].finetune = this.sample[i].finetune - 16;
 
-    this.sample[i].volume = buffer[sampleStart+25];
+    this.sample[i].volume = buffer[sampleOffset+25];
 
-    this.sample[i].loopstart = 2*numFromBuffer(buffer, sampleStart+26, 2);
-    this.sample[i].looplength = 2*numFromBuffer(buffer, sampleStart+28, 2);
+    this.sample[i].loopstart = 2*numFromBuffer(buffer, sampleOffset+26, 2);
+    this.sample[i].looplength = 2*numFromBuffer(buffer, sampleOffset+28, 2);
     if (this.sample[i].looplength == 2)
       this.sample[i].looplength = 0;
     if (this.sample[i].loopstart > this.sample[i].length) {
@@ -243,85 +243,74 @@ Protracker.prototype.parse = function(buffer) {
   // pattern data (individual notes for each pattern)
   var patlen = 4*64*this.channels; // 4 bytes per note, 64 beat per pattern, one note per channel per beat
   this.patternDataRaw = [];
-  this.note = [];
   this.patternDataUnpacked = [];
   for(i=0; i<this.patterns; i++) {
-    this.patternDataUnpacked[i]=new Uint8Array(this.channels*64*5);
-
     // copy pattern data from raw buffer
     this.patternDataRaw[i] = copyFromBuffer(buffer, new Uint8Array(patlen), 1084+i*patlen, patlen);
 
-    // for each channel, set the notes from raw pattern data
-    this.note[i] = new Uint8Array(this.channels*64);
-    for(j=0; j<64; j++) for(c=0;c<this.channels;c++) {
-      this.note[i][j*this.channels+c]=0;
-      var n=(this.patternDataRaw[i][j*4*this.channels+c*4]&0x0f)<<8 | this.patternDataRaw[i][j*4*this.channels+c*4+1];
-      for(var np=0; np<this.baseperiodtable.length; np++)
-        if (n==this.baseperiodtable[np]) this.note[i][j*this.channels+c]=np;
-    }
-
+    // unpack pattern data
+    this.patternDataUnpacked[i] = new Uint8Array(this.channels*64*5);
     for(j=0; j<64; j++) {
       for(c=0; c<this.channels; c++) {
-        var pp= j*4*this.channels+c*4;
-        var ppu=j*5*this.channels+c*5;
-        var n=(this.patternDataRaw[i][pp]&0x0f)<<8 | this.patternDataRaw[i][pp+1];
+        var pp = j*4*this.channels+c*4;
+        var ppu = j*5*this.channels+c*5;
+
+        // identify note period (lookup value split 4 bits on byte 1, all of byte 2)
+        var n = (this.patternDataRaw[i][pp]&0x0f)<<8 | this.patternDataRaw[i][pp+1];
         if (n) {
-          n=this.note[i][j*this.channels+c];
-          n=(n%12)|(Math.floor(n/12)+2)<<4;
+          var ptlu = 0;
+          for(var np=0; np<this.baseperiodtable.length; np++)
+            if (n==this.baseperiodtable[np])
+              ptlu = np;
+          n = ptlu;
+
+          n = (n%12)|(Math.floor(n/12)+2)<<4;
         }
-        this.patternDataUnpacked[i][ppu+0]=(n)?n:255;
-        this.patternDataUnpacked[i][ppu+1]=this.patternDataRaw[i][pp+0]&0xf0 | this.patternDataRaw[i][pp+2]>>4;
-        this.patternDataUnpacked[i][ppu+2]=255;
-        this.patternDataUnpacked[i][ppu+3]=this.patternDataRaw[i][pp+2]&0x0f;
-        this.patternDataUnpacked[i][ppu+4]=this.patternDataRaw[i][pp+3];
+          // note period
+        this.patternDataUnpacked[i][ppu+0] = n || 255;
+          // sample number (split across bytes 1/3)
+        this.patternDataUnpacked[i][ppu+1] = this.patternDataRaw[i][pp+0]&0xf0 | this.patternDataRaw[i][pp+2]>>4;
+          // TODO: ??? what is this value?
+        this.patternDataUnpacked[i][ppu+2] = 255;
+          // effect command - part 1 (4 bits)
+        this.patternDataUnpacked[i][ppu+3] = this.patternDataRaw[i][pp+2]&0x0f;
+          // effect command - part 2
+        this.patternDataUnpacked[i][ppu+4] = this.patternDataRaw[i][pp+3];
       }
     }
   }
 
   // sample data (actual sample content)
-  var sst=1084+this.patterns*patlen;
-  for(i=0; i<this.samples; i++) {
-    this.sample[i].data=new Float32Array(this.sample[i].length);
-    for(j=0;j<this.sample[i].length;j++) {
-      var q=buffer[sst+j];
-      if (q<128) {
-        q=q/128.0;
-      } else {
-        q=((q-128)/128.0)-1.0;
-      }
-      this.sample[i].data[j]=q;
-    }
-    sst+=this.sample[i].length;
-  }
+  sampleOffset = 1084+this.patterns*patlen;
+  this.sample.forEach(sample=>{
+    sample.data = copyFromBuffer(
+      buffer, new Float32Array(sample.length),
+      sampleOffset, sample.length,
+      q=>q<128 ? q/128.0 : ((q-128.0)/128.0)-1.0
+    );
+    sampleOffset += sample.length;
+  })
 
   // look ahead at very first row to see if filter gets enabled
   this.filter=false;
-  for(var ch=0; ch<this.channels; ch++)
-  {
+  for(var ch=0; ch<this.channels; ch++) {
     p=this.patternSequence[0];
     pp=ch*4;
     var cmd=this.patternDataRaw[p][pp+2]&0x0f, data=this.patternDataRaw[p][pp+3];
     if (cmd==0x0e && ((data&0xf0)==0x00)) {
-      if (!(data&0x01)) {
-        this.filter=true;
-      } else {
-        this.filter=false;
-      }
+      this.filter = !(data&0x01)
     }
   }
 
   // set lowpass cutoff
   if (this.context) {
-    if (this.filter) {
-      this.lowpassNode.frequency.value=3275;
-    } else {
-      this.lowpassNode.frequency.value=28867;
-    }
+    this.lowpassNode.frequency.value = this.filter ? 3275 : 28867;
   }
 
+  // clear channel output levels
   this.chvu = new Float32Array(this.channels).map(()=>0.0);
 
-  return true;
+  return true; // TODO: change this to async
 }
 
 

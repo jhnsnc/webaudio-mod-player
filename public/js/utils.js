@@ -33,9 +33,9 @@ function numFromBuffer(buffer, start, length) {
   }
   return result;
 }
-function copyFromBuffer(buffer, target, start, length) {
+function copyFromBuffer(buffer, target, start, length, mutate) {
   for (var i=0; i<length; i++) {
-    target[i] = buffer[start+i];
+    target[i] = mutate ? mutate(buffer[start+i]) : buffer[start+i];
   }
   return target;
 }
