@@ -264,7 +264,7 @@ Protracker.prototype.parse = function(buffer) {
               ptlu = np;
           n = ptlu;
 
-          n = (n%12)|(Math.floor(n/12)+2)<<4;
+          n = (n%12)|(Math.floor(n/12)+2)<<4; // convert to (octave/note), highest val 0b01001011
         }
           // note period
         this.patternDataUnpacked[i][ppu+0] = n || 255;
@@ -272,9 +272,9 @@ Protracker.prototype.parse = function(buffer) {
         this.patternDataUnpacked[i][ppu+1] = this.patternDataRaw[i][pp+0]&0xf0 | this.patternDataRaw[i][pp+2]>>4;
           // TODO: ??? what is this value?
         this.patternDataUnpacked[i][ppu+2] = 255;
-          // effect command - part 1 (4 bits)
+          // effect command (4 bits)
         this.patternDataUnpacked[i][ppu+3] = this.patternDataRaw[i][pp+2]&0x0f;
-          // effect command - part 2
+          // effect params (8 bits)
         this.patternDataUnpacked[i][ppu+4] = this.patternDataRaw[i][pp+3];
       }
     }
@@ -286,19 +286,19 @@ Protracker.prototype.parse = function(buffer) {
     sample.data = copyFromBuffer(
       buffer, new Float32Array(sample.length),
       sampleOffset, sample.length,
-      q=>q<128 ? q/128.0 : ((q-128.0)/128.0)-1.0
+      q=>q<128 ? q/128.0 : ((q-128.0)/128.0)-1.0 // [-1.0, 1.0]
     );
     sampleOffset += sample.length;
   })
 
   // look ahead at very first row to see if filter gets enabled
-  this.filter=false;
+  this.filter = false;
+  var firstPattern = this.patternDataUnpacked[this.patternSequence[0]];
   for(var ch=0; ch<this.channels; ch++) {
-    p=this.patternSequence[0];
-    pp=ch*4;
-    var cmd=this.patternDataRaw[p][pp+2]&0x0f, data=this.patternDataRaw[p][pp+3];
-    if (cmd==0x0e && ((data&0xf0)==0x00)) {
-      this.filter = !(data&0x01)
+    var cmd = firstPattern[ch*4+3];
+    var data = firstPattern[ch*4+4];
+    if (cmd == 0xe && ((data&0xf0) == 0x00)) {
+      this.filter = !(data&0x01);
     }
   }
 
