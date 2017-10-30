@@ -14,7 +14,7 @@ var $channelVisualization, $channelsList, $samplesList;
 var $modTitle, $modInfo, $timingContainer;
 // var $btnPrevTrack, $btnNextTrack;
 var $btnBack, $btnForward, $btnPlay, $btnPause;
-var $btnRepeat, $btnStereo, $btnAmigaFilter, $btnVisualizerMode, $btnShowLoadDialog;
+var $btnRepeat, $btnStereo, $btnAmigaFilter, $btnVisualizerMode, $btnShowLoadDialog, $btnPlayRandom;
 var $btnLoadSelection;
 
 function showLoaderInfo(module) {
@@ -121,6 +121,7 @@ $(document).ready(function() {
   $btnVisualizerMode = $('#modvis');
   $btnAmigaFilter = $('#modamiga');
   $btnShowLoadDialog = $('#load_song');
+  $btnPlayRandom = $('#random_song');
 
   $btnLoadSelection = $('#load');
 
@@ -181,6 +182,7 @@ $(document).ready(function() {
       savePreference('modamiga', '1200');
     }
   });
+  $btnPlayRandom.click(()=>{ playRandomTrack(true); });
 
   $(document).keyup(handleKeyboardInput);
 
