@@ -386,7 +386,7 @@ Modplayer.prototype.createContext = function() {
     this.mixerNode=this.context.createScriptProcessor(this.bufferlen, 1, 2);
   }
   this.mixerNode.module=this;
-  this.mixerNode.onaudioprocess=Modplayer.prototype.mix;
+  this.mixerNode.onaudioprocess=Modplayer.prototype.mix.bind(this);
 
   // patch up some cables :)
   this.mixerNode.connect(this.filterNode);
@@ -397,31 +397,36 @@ Modplayer.prototype.createContext = function() {
 
 // scriptnode callback - pass through to player class
 Modplayer.prototype.mix = function(ape) { // NOTE: ape = AudioProcessEvent
-  var mod;
+  if (this.player && this.delayfirst==0) {
+    this.player.repeat=this.repeat;
 
-  if (ape.srcElement) {
-    mod=ape.srcElement.module;
-  } else {
-    mod=this.module;
-  }
+    var useNewMixMethod = (this.format === 'mod');
 
-  if (mod.player && mod.delayfirst==0) {
-    mod.player.repeat=mod.repeat;
-
-    var bufs=new Array(ape.outputBuffer.getChannelData(0), ape.outputBuffer.getChannelData(1));
+    var outputBuffs=new Array(ape.outputBuffer.getChannelData(0), ape.outputBuffer.getChannelData(1));
     var buflen=ape.outputBuffer.length;
-    mod.player.mix(mod.player, bufs, buflen);
+    // TODO: make this return values rather than assuming changes to params by reference
+    var renderedBuffs;
+    if (useNewMixMethod) {
+      renderedBuffs = this.player.mix(this.player, outputBuffs, buflen);
+    } else {
+      this.player.mix(this.player, outputBuffs, buflen);
+    }
 
     // apply stereo separation and soft clipping
     var outp=new Float32Array(2);
     for(var s=0;s<buflen;s++) {
-      outp[0]=bufs[0][s];
-      outp[1]=bufs[1][s];
+      if (useNewMixMethod) {
+        outp[0]=renderedBuffs[0][s];
+        outp[1]=renderedBuffs[1][s];
+      } else {
+        outp[0]=outputBuffs[0][s];
+        outp[1]=outputBuffs[1][s];
+      }
 
       // a more headphone-friendly stereo separation
-      if (mod.separation) {
+      if (this.separation) {
         t=outp[0];
-        if (mod.separation==2) { // mono
+        if (this.separation==2) { // mono
           outp[0]=outp[0]*0.5 + outp[1]*0.5;
           outp[1]=outp[1]*0.5 + t*0.5;
         } else { // narrow stereo
@@ -431,32 +436,32 @@ Modplayer.prototype.mix = function(ape) { // NOTE: ape = AudioProcessEvent
       }
 
       // scale down and soft clip
-      outp[0]/=mod.mixval; outp[0]=0.5*(Math.abs(outp[0]+0.975)-Math.abs(outp[0]-0.975));
-      outp[1]/=mod.mixval; outp[1]=0.5*(Math.abs(outp[1]+0.975)-Math.abs(outp[1]-0.975));
+      outp[0]/=this.mixval; outp[0]=0.5*(Math.abs(outp[0]+0.975)-Math.abs(outp[0]-0.975));
+      outp[1]/=this.mixval; outp[1]=0.5*(Math.abs(outp[1]+0.975)-Math.abs(outp[1]-0.975));
 
-      bufs[0][s]=outp[0];
-      bufs[1][s]=outp[1];
+      outputBuffs[0][s]=outp[0];
+      outputBuffs[1][s]=outp[1];
     }
 
-    mod.row=mod.player.row;
-    mod.position=mod.player.position;
-    mod.speed=mod.player.speed;
-    mod.bpm=mod.player.bpm;
-    mod.endofsong=mod.player.endofsong;
+    this.row=this.player.row;
+    this.position=this.player.position;
+    this.speed=this.player.speed;
+    this.bpm=this.player.bpm;
+    this.endofsong=this.player.endofsong;
 
-    if (mod.player.filter != mod.filter) {
-      mod.setfilter(mod.player.filter);
+    if (this.player.filter != this.filter) {
+      this.setfilter(this.player.filter);
     }
 
-    if (mod.endofsong && mod.playing) mod.stop();
+    if (this.endofsong && this.playing) this.stop();
 
-    if (mod.delayfirst>0) mod.delayfirst--;
-    mod.delayload=0;
+    if (this.delayfirst>0) this.delayfirst--;
+    this.delayload=0;
 
     // update this.chvu from player channel vu
-    for(var i=0;i<mod.player.channels;i++) {
-      mod.chvu[i]=mod.chvu[i]*0.25 + mod.player.chvu[i]*0.75;
-      mod.player.chvu[i]=0.0;
+    for(var i=0;i<this.player.channels;i++) {
+      this.chvu[i]=this.chvu[i]*0.25 + this.player.chvu[i]*0.75;
+      this.player.chvu[i]=0.0;
     }
   }
 }

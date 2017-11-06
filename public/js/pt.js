@@ -369,9 +369,13 @@ Protracker.prototype.advance = function(mod) {
 
 // mix an audio buffer with data
 Protracker.prototype.mix = function(mod, bufs, buflen) {
+  // mod - basically `this`, holds state of mod player
+  // bufs - array of 2 buffers, representing left/right stereo (modified at end)
+  // buflen - uint, number of samples to fill in buffer (unmodified)
   var f;
   var p, pp, n, nn;
 
+  var result = [new Float32Array(buflen), new Float32Array(buflen)];
   var outp=new Float32Array(2);
   for(var s=0;s<buflen;s++)
   {
@@ -383,8 +387,7 @@ Protracker.prototype.mix = function(mod, bufs, buflen) {
       mod.advance(mod);
 
       var och=0;
-      for(var ch=0;ch<mod.channels;ch++)
-      {
+      for(var ch=0;ch<mod.channels;ch++) {
 
         // calculate playback position
         p=mod.patternSequence[mod.position];
@@ -418,7 +421,7 @@ Protracker.prototype.mix = function(mod, bufs, buflen) {
         mod.channel[ch].voiceperiod=mod.channel[ch].period;
 
         // kill empty samples
-        if (!mod.sample[mod.channel[ch].sample].length) mod.channel[ch].noteon=0;
+        if (!mod.sample[mod.channel[ch].sample].length) mod.channel[ch].noteon = 0;
 
         // effects
         if (mod.flags&1) {
@@ -482,9 +485,11 @@ Protracker.prototype.mix = function(mod, bufs, buflen) {
     }
 
     // done - store to output buffer
-    bufs[0][s]=outp[0];
-    bufs[1][s]=outp[1];
+    result[0][s]=outp[0];
+    result[1][s]=outp[1];
   }
+
+  return result;
 }
 
 
