@@ -262,7 +262,7 @@ Modplayer.prototype.setfilter = function(f) {
   if (f) {
     this.lowpassNode.frequency.value=3275;
   } else {
-     this.lowpassNode.frequency.value=28867;
+    this.lowpassNode.frequency.value=28867;
   }
   this.filter=f;
   if (this.player) this.player.filter=f;
@@ -412,42 +412,14 @@ Modplayer.prototype.mix = function(ape) { // NOTE: ape = AudioProcessEvent
       this.player.mix(this.player, outputBuffs, buflen);
     }
 
-    // apply stereo separation and soft clipping
-    var outp=new Float32Array(2);
-    for(var s=0;s<buflen;s++) {
-      if (useNewMixMethod) {
-        outp[0]=renderedBuffs[0][s];
-        outp[1]=renderedBuffs[1][s];
-      } else {
-        outp[0]=outputBuffs[0][s];
-        outp[1]=outputBuffs[1][s];
-      }
+    outputBuffs = Modplayer.applyStereoAndSoftClipping((useNewMixMethod ? renderedBuffs : outputBuffs), this.separation, this.mixval );
 
-      // a more headphone-friendly stereo separation
-      if (this.separation) {
-        t=outp[0];
-        if (this.separation==2) { // mono
-          outp[0]=outp[0]*0.5 + outp[1]*0.5;
-          outp[1]=outp[1]*0.5 + t*0.5;
-        } else { // narrow stereo
-          outp[0]=outp[0]*0.65 + outp[1]*0.35;
-          outp[1]=outp[1]*0.65 + t*0.35;
-        }
-      }
-
-      // scale down and soft clip
-      outp[0]/=this.mixval; outp[0]=0.5*(Math.abs(outp[0]+0.975)-Math.abs(outp[0]-0.975));
-      outp[1]/=this.mixval; outp[1]=0.5*(Math.abs(outp[1]+0.975)-Math.abs(outp[1]-0.975));
-
-      outputBuffs[0][s]=outp[0];
-      outputBuffs[1][s]=outp[1];
-    }
-
-    this.row=this.player.row;
-    this.position=this.player.position;
-    this.speed=this.player.speed;
-    this.bpm=this.player.bpm;
-    this.endofsong=this.player.endofsong;
+    // update playback position info
+    this.row = this.player.row;
+    this.position = this.player.position;
+    this.speed = this.player.speed;
+    this.bpm = this.player.bpm;
+    this.endofsong = this.player.endofsong;
 
     if (this.player.filter != this.filter) {
       this.setfilter(this.player.filter);
@@ -456,12 +428,39 @@ Modplayer.prototype.mix = function(ape) { // NOTE: ape = AudioProcessEvent
     if (this.endofsong && this.playing) this.stop();
 
     if (this.delayfirst>0) this.delayfirst--;
-    this.delayload=0;
+    this.delayload = 0; // why?
 
     // update this.chvu from player channel vu
-    for(var i=0;i<this.player.channels;i++) {
-      this.chvu[i]=this.chvu[i]*0.25 + this.player.chvu[i]*0.75;
-      this.player.chvu[i]=0.0;
+    for(var i=0; i<this.player.channels; i++) {
+      this.chvu[i] = 0.25*this.chvu[i] + 0.75*this.player.chvu[i];
+      this.player.chvu[i] = 0.0;
     }
   }
+}
+
+Modplayer.applyStereoAndSoftClipping = function(buffs, separation, mixval) {
+  if (buffs.length !== 2) { return null; }
+
+  var t;
+  for(var s=0, var len=buffs[0].length; s<len; s++) {
+    // a more headphone-friendly stereo separation
+    if (separation) {
+      if (separation==2) { // mono
+        t = 0.5 * (buffs[0][s] + buffs[1][s]);
+        buffs[0][s] = buffs[1][s] = t;
+      } else { // narrow stereo
+        t = buffs[0][s];
+        buffs[0][s] = 0.65*buffs[0][s] + 0.35*buffs[1][s];
+        buffs[1][s] = 0.65*buffs[1][s] + 0.35*t;
+      }
+    }
+
+    // scale down and soft clip
+    buffs[0][s] /= mixval;
+    buffs[0][s] = 0.5*(Math.abs(buffs[0][s]+0.975) - Math.abs(buffs[0][s]-0.975));
+    buffs[1][s] /= mixval;
+    buffs[1][s] = 0.5*(Math.abs(buffs[1][s]+0.975) - Math.abs(buffs[1][s]-0.975));
+  }
+
+  return buffs;
 }
