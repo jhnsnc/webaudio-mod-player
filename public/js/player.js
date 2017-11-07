@@ -355,7 +355,8 @@ Modplayer.prototype.currentpattlen = function() {
   return this.player.patternlen[this.player.patternSequence[this.player.position]];
 }
 
-
+// TODO: separate out basic init from node setup?
+// TODO: add cleanup function to remove nodes at end of playback?
 // create the web audio context
 Modplayer.prototype.createContext = function() {
   if ( typeof AudioContext !== 'undefined') {
@@ -412,7 +413,12 @@ Modplayer.prototype.mix = function(ape) { // NOTE: ape = AudioProcessEvent
       this.player.mix(this.player, outputBuffs, buflen);
     }
 
-    outputBuffs = Modplayer.applyStereoAndSoftClipping((useNewMixMethod ? renderedBuffs : outputBuffs), this.separation, this.mixval );
+    Modplayer.applyStereoAndSoftClipping(
+      outputBuffs,
+      (useNewMixMethod ? renderedBuffs : outputBuffs),
+      this.separation,
+      this.mixval
+    );
 
     // update playback position info
     this.row = this.player.row;
@@ -438,11 +444,11 @@ Modplayer.prototype.mix = function(ape) { // NOTE: ape = AudioProcessEvent
   }
 }
 
-Modplayer.applyStereoAndSoftClipping = function(buffs, separation, mixval) {
+Modplayer.applyStereoAndSoftClipping = function(output, buffs, separation, mixval) {
   if (buffs.length !== 2) { return null; }
 
   var t;
-  for(var s=0, var len=buffs[0].length; s<len; s++) {
+  for(var s=0, len=buffs[0].length; s<len; s++) {
     // a more headphone-friendly stereo separation
     if (separation) {
       if (separation==2) { // mono
@@ -460,7 +466,9 @@ Modplayer.applyStereoAndSoftClipping = function(buffs, separation, mixval) {
     buffs[0][s] = 0.5*(Math.abs(buffs[0][s]+0.975) - Math.abs(buffs[0][s]-0.975));
     buffs[1][s] /= mixval;
     buffs[1][s] = 0.5*(Math.abs(buffs[1][s]+0.975) - Math.abs(buffs[1][s]-0.975));
-  }
 
-  return buffs;
+    // TODO: make pure instead of having this side effect
+    output[0][s] = buffs[0][s];
+    output[1][s] = buffs[1][s];
+  }
 }
